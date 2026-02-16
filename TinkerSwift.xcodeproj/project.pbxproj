@@ -7,24 +7,36 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		010775AB09E90EB72A6C60AC /* EditorPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41FDE6BC6FB49F608A299BB4 /* EditorPaneView.swift */; };
+		04AFEEC03120232C61CD5B87 /* ResultPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 147DD2B832E03877D14035A9 /* ResultPaneView.swift */; };
+		0BB649EE698FA066422C6CCE /* ReplWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C5113908F526D1FF011EA45 /* ReplWorkspaceView.swift */; };
+		1E7D3EB22066CF47130B6446 /* TinkerSwiftState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E586EF248F30C2CD75ABA8A7 /* TinkerSwiftState.swift */; };
 		297DB11570450B821E3973B0 /* STTextView-Plugin-Neon in Frameworks */ = {isa = PBXBuildFile; productRef = 57055A4399366F807072010C /* STTextView-Plugin-Neon */; };
+		445CC1FD2078345E2201501D /* AppKitCodeEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1DE4774A9619733B2B7024 /* AppKitCodeEditor.swift */; };
 		71C04D5D57B837CA1D54B161 /* EditorPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69E10726DD199C8ACE84BCD1 /* EditorPreferences.swift */; };
 		85DDAF0FB6FFF116D11287D6 /* PHPExecutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */; };
 		917F845542B9FDBCE23A1635 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2CE3011C05D1288AB735216 /* ContentView.swift */; };
 		98012327C79B3EA468725CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CA41881C1CDF7F49F88F2711 /* Assets.xcassets */; };
 		99017869037F7E3C14147365 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 681EE17BA70F9CAE63E1797F /* SettingsView.swift */; };
+		B1C29B9E5FB3E66BAA809905 /* ProjectSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1EC35E5E2B4AD47E6CD99B1 /* ProjectSidebarView.swift */; };
 		D3D4C941638D44660478ABB8 /* STTextView in Frameworks */ = {isa = PBXBuildFile; productRef = D97CADF26E40B2AAF2540EF7 /* STTextView */; };
 		D77CB2CA91C6B2466388DDA9 /* TinkerSwiftApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7C47FE7E31C32BEEF95CB4 /* TinkerSwiftApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		147DD2B832E03877D14035A9 /* ResultPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultPaneView.swift; sourceTree = "<group>"; };
 		197A780140CD674D3D057BB7 /* TinkerSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TinkerSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2C5113908F526D1FF011EA45 /* ReplWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplWorkspaceView.swift; sourceTree = "<group>"; };
+		41FDE6BC6FB49F608A299BB4 /* EditorPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorPaneView.swift; sourceTree = "<group>"; };
 		681EE17BA70F9CAE63E1797F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		69E10726DD199C8ACE84BCD1 /* EditorPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorPreferences.swift; sourceTree = "<group>"; };
 		896AA6D6A28BA0BDDB5C2A86 /* STTextView-Plugin-Neon */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "STTextView-Plugin-Neon"; path = "Vendor/STTextView-Plugin-Neon"; sourceTree = SOURCE_ROOT; };
 		9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPExecutionService.swift; sourceTree = "<group>"; };
+		A1EC35E5E2B4AD47E6CD99B1 /* ProjectSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectSidebarView.swift; sourceTree = "<group>"; };
+		BE1DE4774A9619733B2B7024 /* AppKitCodeEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitCodeEditor.swift; sourceTree = "<group>"; };
 		C2CE3011C05D1288AB735216 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		CA41881C1CDF7F49F88F2711 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E586EF248F30C2CD75ABA8A7 /* TinkerSwiftState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TinkerSwiftState.swift; sourceTree = "<group>"; };
 		FA7C47FE7E31C32BEEF95CB4 /* TinkerSwiftApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TinkerSwiftApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -58,6 +70,14 @@
 			);
 			sourceTree = "<group>";
 		};
+		46718E352D49812C3EE86757 /* State */ = {
+			isa = PBXGroup;
+			children = (
+				E586EF248F30C2CD75ABA8A7 /* TinkerSwiftState.swift */,
+			);
+			path = State;
+			sourceTree = "<group>";
+		};
 		A07BB4D64935180AAFD86CEB /* TinkerSwift */ = {
 			isa = PBXGroup;
 			children = (
@@ -67,8 +87,22 @@
 				9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */,
 				681EE17BA70F9CAE63E1797F /* SettingsView.swift */,
 				FA7C47FE7E31C32BEEF95CB4 /* TinkerSwiftApp.swift */,
+				46718E352D49812C3EE86757 /* State */,
+				A14755A640BD23A122BE1A5E /* Views */,
 			);
 			path = TinkerSwift;
+			sourceTree = "<group>";
+		};
+		A14755A640BD23A122BE1A5E /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BE1DE4774A9619733B2B7024 /* AppKitCodeEditor.swift */,
+				41FDE6BC6FB49F608A299BB4 /* EditorPaneView.swift */,
+				A1EC35E5E2B4AD47E6CD99B1 /* ProjectSidebarView.swift */,
+				2C5113908F526D1FF011EA45 /* ReplWorkspaceView.swift */,
+				147DD2B832E03877D14035A9 /* ResultPaneView.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 		F7A10CAF945FD5F65EF5601D /* Packages */ = {
@@ -157,11 +191,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				445CC1FD2078345E2201501D /* AppKitCodeEditor.swift in Sources */,
 				917F845542B9FDBCE23A1635 /* ContentView.swift in Sources */,
+				010775AB09E90EB72A6C60AC /* EditorPaneView.swift in Sources */,
 				71C04D5D57B837CA1D54B161 /* EditorPreferences.swift in Sources */,
 				85DDAF0FB6FFF116D11287D6 /* PHPExecutionService.swift in Sources */,
+				B1C29B9E5FB3E66BAA809905 /* ProjectSidebarView.swift in Sources */,
+				0BB649EE698FA066422C6CCE /* ReplWorkspaceView.swift in Sources */,
+				04AFEEC03120232C61CD5B87 /* ResultPaneView.swift in Sources */,
 				99017869037F7E3C14147365 /* SettingsView.swift in Sources */,
 				D77CB2CA91C6B2466388DDA9 /* TinkerSwiftApp.swift in Sources */,
+				1E7D3EB22066CF47130B6446 /* TinkerSwiftState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

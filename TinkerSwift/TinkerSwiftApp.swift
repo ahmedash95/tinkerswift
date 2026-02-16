@@ -12,7 +12,8 @@ extension FocusedValues {
 }
 
 private struct TinkerSwiftCommands: Commands {
-    @Binding var appUIScale: Double
+    let appState: TinkerSwiftState
+
     @FocusedValue(\.runCodeAction) private var runCodeAction
 
     var body: some Commands {
@@ -26,18 +27,19 @@ private struct TinkerSwiftCommands: Commands {
 
         CommandGroup(after: .toolbar) {
             Divider()
+
             Button("Zoom In") {
-                appUIScale = min(appUIScale + 0.1, 3.0)
+                appState.appUIScale = min(appState.appUIScale + 0.1, 3.0)
             }
             .keyboardShortcut("=", modifiers: [.command])
 
             Button("Zoom Out") {
-                appUIScale = max(appUIScale - 0.1, 0.6)
+                appState.appUIScale = max(appState.appUIScale - 0.1, 0.6)
             }
             .keyboardShortcut("-", modifiers: [.command])
 
             Button("Actual Size") {
-                appUIScale = 1.0
+                appState.appUIScale = 1.0
             }
             .keyboardShortcut("0", modifiers: [.command])
         }
@@ -46,18 +48,20 @@ private struct TinkerSwiftCommands: Commands {
 
 @main
 struct TinkerSwiftApp: App {
-    @AppStorage("app.uiScale") private var appUIScale = 1.0
+    @State private var appState = TinkerSwiftState()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(appState)
         }
         .commands {
-            TinkerSwiftCommands(appUIScale: $appUIScale)
+            TinkerSwiftCommands(appState: appState)
         }
 
         Settings {
             SettingsView()
+                .environment(appState)
         }
     }
 }

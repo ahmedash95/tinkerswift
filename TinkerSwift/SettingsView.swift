@@ -14,35 +14,26 @@ struct SettingsView: View {
 }
 
 private struct EditorSettingsTab: View {
-    @AppStorage("editor.showLineNumbers") private var showLineNumbers = true
-    @AppStorage("editor.wrapLines") private var wrapLines = true
-    @AppStorage("editor.highlightSelectedLine") private var highlightSelectedLine = true
-    @AppStorage("editor.syntaxHighlighting") private var syntaxHighlighting = true
-    @AppStorage("editor.colorScheme") private var editorColorSchemeRaw = EditorColorScheme.default.rawValue
-
-    private var colorSchemeBinding: Binding<EditorColorScheme> {
-        Binding(
-            get: { EditorColorScheme(rawValue: editorColorSchemeRaw) ?? .default },
-            set: { editorColorSchemeRaw = $0.rawValue }
-        )
-    }
+    @Environment(TinkerSwiftState.self) private var appState
 
     var body: some View {
+        @Bindable var appState = appState
+
         VStack(alignment: .leading, spacing: 16) {
             Text("Editor Settings")
                 .font(.title3.weight(.semibold))
 
-            Toggle("Show Line Numbers", isOn: $showLineNumbers)
-            Toggle("Wrap Lines", isOn: $wrapLines)
-            Toggle("Highlight Current Line", isOn: $highlightSelectedLine)
-            Toggle("Syntax Highlighting", isOn: $syntaxHighlighting)
+            Toggle("Show Line Numbers", isOn: $appState.showLineNumbers)
+            Toggle("Wrap Lines", isOn: $appState.wrapLines)
+            Toggle("Highlight Current Line", isOn: $appState.highlightSelectedLine)
+            Toggle("Syntax Highlighting", isOn: $appState.syntaxHighlighting)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Color Scheme")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                Picker("Color Scheme", selection: colorSchemeBinding) {
+                Picker("Color Scheme", selection: $appState.editorColorScheme) {
                     ForEach(EditorColorScheme.allCases) { scheme in
                         Text(scheme.title).tag(scheme)
                     }
