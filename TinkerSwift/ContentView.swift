@@ -9,17 +9,30 @@ private struct LaravelProject: Codable, Hashable, Identifiable {
     var name: String { URL(fileURLWithPath: path).lastPathComponent }
 }
 
+private struct RunMetrics {
+    let durationMs: Double
+    let peakMemoryBytes: UInt64
+}
+
 struct ContentView: View {
+    private static let memoryFormatter: ByteCountFormatter = {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .memory
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        formatter.includesUnit = true
+        formatter.isAdaptive = true
+        return formatter
+    }()
+
     @AppStorage("app.uiScale") private var appUIScale = 1.0
     @AppStorage("laravel.projectPath") private var laravelProjectPath = ""
     @AppStorage("laravel.projectsJSON") private var laravelProjectsJSON = "[]"
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
     @State private var isPickingProjectFolder = false
     @State private var isRunning = false
+    @State private var lastRunMetrics: RunMetrics?
     @State private var projects: [LaravelProject] = []
     @State private var code = """
-<?php
-
 use App\\Models\\User;
 
 $users = User::query()
@@ -43,22 +56,56 @@ return $users->toJson();
         return URL(fileURLWithPath: laravelProjectPath).lastPathComponent
     }
 
+    private var executionTimeText: String {
+        if isRunning {
+            return "Running"
+        }
+        guard let metrics = lastRunMetrics else {
+            return "--"
+        }
+        return formatDuration(metrics.durationMs)
+    }
+
+    private var memoryUsageText: String {
+        if isRunning {
+            return "--"
+        }
+        guard let metrics = lastRunMetrics else {
+            return "--"
+        }
+        return formatMemory(metrics.peakMemoryBytes)
+    }
+
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            List(selection: $laravelProjectPath) {
-                Section("Projects") {
-                    if projects.isEmpty {
-                        Text("No projects added")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(projects) { project in
-                            Label(project.name, systemImage: "folder")
-                                .tag(project.path)
+            VStack(spacing: 0) {
+                List(selection: $laravelProjectPath) {
+                    Section("Projects") {
+                        if projects.isEmpty {
+                            Text("No projects added")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(projects) { project in
+                                Label(project.name, systemImage: "folder")
+                                    .tag(project.path)
+                            }
                         }
                     }
                 }
+                .listStyle(.sidebar)
+
+                Divider()
+
+                HStack {
+                    Button(action: { isPickingProjectFolder = true }) {
+                        Label("Add Project", systemImage: "folder.badge.plus")
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
             }
-            .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 240)
         } detail: {
             ReplWorkspace(
@@ -68,8 +115,9 @@ return $users->toJson();
                 selectedProjectName: selectedProjectName,
                 selectedProjectPath: laravelProjectPath,
                 contentScale: scale,
-                runAction: runCodeTapped,
-                selectProjectFolderAction: { isPickingProjectFolder = true }
+                executionTimeText: executionTimeText,
+                memoryUsageText: memoryUsageText,
+                runAction: runCodeTapped
             )
         }
         .frame(minWidth: 1000, minHeight: 620)
@@ -106,6 +154,12 @@ return $users->toJson();
         let execution = await PHPExecutionService.run(code: code, projectPath: laravelProjectPath)
         let stdout = execution.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         let stderr = execution.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let durationMs = execution.durationMs,
+           let peakMemoryBytes = execution.peakMemoryBytes {
+            lastRunMetrics = RunMetrics(durationMs: durationMs, peakMemoryBytes: peakMemoryBytes)
+        } else {
+            lastRunMetrics = nil
+        }
 
         if !stdout.isEmpty {
             result = execution.stdout
@@ -159,6 +213,17 @@ return $users->toJson();
         var seen = Set<String>()
         return decoded.filter { seen.insert($0.path).inserted }
     }
+
+    private func formatDuration(_ durationMs: Double) -> String {
+        if durationMs < 1000 {
+            return String(format: "%.0f ms", durationMs)
+        }
+        return String(format: "%.2f s", durationMs / 1000)
+    }
+
+    private func formatMemory(_ bytes: UInt64) -> String {
+        ContentView.memoryFormatter.string(fromByteCount: Int64(bytes))
+    }
 }
 
 private struct ReplWorkspace: View {
@@ -168,8 +233,9 @@ private struct ReplWorkspace: View {
     let selectedProjectName: String
     let selectedProjectPath: String
     let contentScale: CGFloat
+    let executionTimeText: String
+    let memoryUsageText: String
     let runAction: () -> Void
-    let selectProjectFolderAction: () -> Void
 
     var body: some View {
         HSplitView {
@@ -182,16 +248,41 @@ private struct ReplWorkspace: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
-                Button(action: selectProjectFolderAction) {
-                    Label("Select Laravel Project", systemImage: "folder.badge.plus")
-                }
-            }
-
-            ToolbarItemGroup(placement: .primaryAction) {
                 Button(action: runAction) {
                     Label("Run", systemImage: "play.fill")
                 }
                 .disabled(isRunning)
+            }
+
+            ToolbarItemGroup(placement: .primaryAction) {
+            }
+
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 8) {
+                    Button(action: {}) {
+                        HStack(spacing: 6) {
+                            Image(systemName: isRunning ? "hourglass" : "timer")
+                            Text(executionTimeText)
+                                .font(.callout.monospacedDigit())
+                        }
+                        .frame(minWidth: 92, alignment: .leading)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Execution time")
+
+                    Button(action: {}) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "memorychip")
+                            Text(memoryUsageText)
+                                .font(.callout.monospacedDigit())
+                        }
+                        .frame(minWidth: 110, alignment: .leading)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Peak memory usage")
+                }
             }
         }
         .navigationTitle(selectedProjectName)
