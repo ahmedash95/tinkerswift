@@ -84,9 +84,11 @@ return $users->toJson();
             guard case let .success(urls) = result, let url = urls.first else { return }
             addProject(url.path())
         }
+        .focusedSceneValue(\.runCodeAction, runCodeTapped)
     }
 
     private func runCodeTapped() {
+        guard !isRunning else { return }
         Task {
             await runCode()
         }
@@ -102,8 +104,18 @@ return $users->toJson();
         defer { isRunning = false }
 
         let execution = await PHPExecutionService.run(code: code, projectPath: laravelProjectPath)
+        let stdout = execution.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        let stderr = execution.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        result = execution.stdout.isEmpty ? "(empty)" : execution.stdout
+        if !stdout.isEmpty {
+            result = execution.stdout
+        } else if !stderr.isEmpty {
+            result = execution.stderr
+        } else if execution.exitCode != 0 {
+            result = "Process failed with exit code \(execution.exitCode)."
+        } else {
+            result = "(empty)"
+        }
     }
 
     private func loadProjects() {
@@ -208,25 +220,24 @@ private struct ResultPane: View {
     }
 
     var body: some View {
-        ZStack {
-            ScrollView([.vertical, .horizontal]) {
+        ZStack(alignment: .topLeading) {
+            ScrollView(.vertical) {
                 Text(formattedResult)
                     .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(12)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             if isRunning {
-                VStack(spacing: 10) {
-                    ProgressView()
-                        .controlSize(.regular)
-                    Text("Executing PHP snippet...")
-                        .font(.system(size: 13 * contentScale, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                ProgressView()
+                    .progressViewStyle(.linear)
+                    .controlSize(.small)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .allowsHitTesting(false)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
