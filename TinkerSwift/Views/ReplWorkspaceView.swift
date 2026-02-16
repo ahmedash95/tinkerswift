@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ReplWorkspaceView: View {
-    @Environment(TinkerSwiftState.self) private var appState
+    @Environment(WorkspaceState.self) private var workspaceState
 
     var body: some View {
         HSplitView {
@@ -15,28 +15,28 @@ struct ReplWorkspaceView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
-                Button(action: appState.toggleRunStop) {
-                    Label(appState.isRunning ? "Stop" : "Run", systemImage: appState.isRunning ? "stop.fill" : "play.fill")
+                Button(action: workspaceState.toggleRunStop) {
+                    Label(workspaceState.isRunning ? "Stop" : "Run", systemImage: workspaceState.isRunning ? "stop.fill" : "play.fill")
                 }
             }
 
             ToolbarItem(placement: .principal) {
                 HStack(spacing: 18) {
                     HStack(spacing: 6) {
-                        Image(systemName: appState.isRunning ? "hourglass" : "timer")
-                        Text(appState.executionTimeText)
+                        Image(systemName: workspaceState.isRunning ? "hourglass" : "timer")
+                        Text(workspaceState.executionTimeText)
                     }
                     .help("Execution time")
 
                     HStack(spacing: 6) {
                         Image(systemName: "memorychip")
-                        Text(appState.memoryUsageText)
+                        Text(workspaceState.memoryUsageText)
                     }
                     .help("Peak memory usage")
                 }
             }
         }
-        .navigationTitle(appState.selectedProjectName)
-        .navigationSubtitle(appState.laravelProjectPath.isEmpty ? "No project selected" : appState.laravelProjectPath)
+        .navigationTitle(workspaceState.selectedProjectName)
+        .navigationSubtitle(workspaceState.laravelProjectPath.isEmpty ? "No project selected" : workspaceState.laravelProjectPath)
     }
 }

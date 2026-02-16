@@ -14,19 +14,19 @@ struct SettingsView: View {
 }
 
 private struct EditorSettingsTab: View {
-    @Environment(TinkerSwiftState.self) private var appState
+    @Environment(AppModel.self) private var appModel
 
     var body: some View {
-        @Bindable var appState = appState
+        @Bindable var appModel = appModel
 
         VStack(alignment: .leading, spacing: 16) {
             Text("Editor Settings")
                 .font(.title3.weight(.semibold))
 
-            Toggle("Show Line Numbers", isOn: $appState.showLineNumbers)
-            Toggle("Wrap Lines", isOn: $appState.wrapLines)
-            Toggle("Highlight Current Line", isOn: $appState.highlightSelectedLine)
-            Toggle("Syntax Highlighting", isOn: $appState.syntaxHighlighting)
+            Toggle("Show Line Numbers", isOn: $appModel.showLineNumbers)
+            Toggle("Wrap Lines", isOn: $appModel.wrapLines)
+            Toggle("Highlight Current Line", isOn: $appModel.highlightSelectedLine)
+            Toggle("Syntax Highlighting", isOn: $appModel.syntaxHighlighting)
 
             Spacer(minLength: 0)
         }

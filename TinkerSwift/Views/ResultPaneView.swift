@@ -1,10 +1,10 @@
 import SwiftUI
 
 struct ResultPaneView: View {
-    @Environment(TinkerSwiftState.self) private var appState
+    @Environment(WorkspaceState.self) private var workspaceState
 
     private var formattedResult: AttributedString {
-        ResultFormatter.format(appState.result, fontSize: 14 * appState.scale)
+        ResultFormatter.format(workspaceState.result, fontSize: 14 * workspaceState.scale)
     }
 
     var body: some View {
@@ -18,7 +18,7 @@ struct ResultPaneView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-            if appState.isRunning {
+            if workspaceState.isRunning {
                 ProgressView()
                     .progressViewStyle(.linear)
                     .controlSize(.small)

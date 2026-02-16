@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 struct PHPExecutionResult {
     let command: String
@@ -11,47 +11,43 @@ struct PHPExecutionResult {
     let wasStopped: Bool
 }
 
-enum PHPExecutionService {
+actor PHPExecutionRunner {
     private struct RuntimeMetrics: Decodable {
         let durationMs: Double
         let peakMemoryBytes: UInt64
     }
-    
-    private static let activeStateLock = NSLock()
-    nonisolated(unsafe) private static var activeProcess: Process?
-    nonisolated(unsafe) private static var activeRunID: UUID?
-    nonisolated(unsafe) private static var stopRequestedRunIDs = Set<UUID>()
 
-    static func run(code: String, projectPath: String) async -> PHPExecutionResult {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let projectURL = URL(fileURLWithPath: projectPath)
-                let artisanURL = projectURL.appendingPathComponent("artisan")
+    private var activeProcess: Process?
+    private var activeRunID: UUID?
+    private var stopRequestedRunIDs = Set<UUID>()
 
-                guard FileManager.default.fileExists(atPath: artisanURL.path()) else {
-                    continuation.resume(returning: PHPExecutionResult(
-                        command: "php <temp-runner-file.php>",
-                        stdout: "",
-                        stderr: "No artisan file found at: \(artisanURL.path())",
-                        exitCode: 127,
-                        durationMs: nil,
-                        peakMemoryBytes: nil,
-                        wasStopped: false
-                    ))
-                    return
-                }
+    func run(code: String, projectPath: String) async -> PHPExecutionResult {
+        let projectURL = URL(fileURLWithPath: projectPath)
+        let artisanURL = projectURL.appendingPathComponent("artisan")
 
-                let id = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-                let snippetFileName = ".tinkerswift_snippet_\(id).php"
-                let runnerFileName = ".tinkerswift_runner_\(id).php"
-                let metricsFileName = ".tinkerswift_metrics_\(id).json"
-                let snippetURL = projectURL.appendingPathComponent(snippetFileName)
-                let runnerURL = projectURL.appendingPathComponent(runnerFileName)
-                let metricsURL = projectURL.appendingPathComponent(metricsFileName)
+        guard FileManager.default.fileExists(atPath: artisanURL.path()) else {
+            return PHPExecutionResult(
+                command: "php <temp-runner-file.php>",
+                stdout: "",
+                stderr: "No artisan file found at: \(artisanURL.path())",
+                exitCode: 127,
+                durationMs: nil,
+                peakMemoryBytes: nil,
+                wasStopped: false
+            )
+        }
 
-                let normalizedCode = normalizedSnippet(code)
+        let id = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        let snippetFileName = ".tinkerswift_snippet_\(id).php"
+        let runnerFileName = ".tinkerswift_runner_\(id).php"
+        let metricsFileName = ".tinkerswift_metrics_\(id).json"
+        let snippetURL = projectURL.appendingPathComponent(snippetFileName)
+        let runnerURL = projectURL.appendingPathComponent(runnerFileName)
+        let metricsURL = projectURL.appendingPathComponent(metricsFileName)
 
-                let runnerScript = """
+        let normalizedCode = Self.normalizedSnippet(code)
+
+        let runnerScript = """
 <?php
 declare(strict_types=1);
 
@@ -103,92 +99,84 @@ try {
 }
 """
 
-                do {
-                    try normalizedCode.write(to: snippetURL, atomically: true, encoding: .utf8)
-                    try runnerScript.write(to: runnerURL, atomically: true, encoding: .utf8)
-                } catch {
-                    continuation.resume(returning: PHPExecutionResult(
-                        command: "php \(runnerFileName)",
-                        stdout: "",
-                        stderr: "Failed to create temporary PHP files: \(error.localizedDescription)",
-                        exitCode: 1,
-                        durationMs: nil,
-                        peakMemoryBytes: nil,
-                        wasStopped: false
-                    ))
-                    return
-                }
+        do {
+            try normalizedCode.write(to: snippetURL, atomically: true, encoding: .utf8)
+            try runnerScript.write(to: runnerURL, atomically: true, encoding: .utf8)
+        } catch {
+            return PHPExecutionResult(
+                command: "php \(runnerFileName)",
+                stdout: "",
+                stderr: "Failed to create temporary PHP files: \(error.localizedDescription)",
+                exitCode: 1,
+                durationMs: nil,
+                peakMemoryBytes: nil,
+                wasStopped: false
+            )
+        }
 
-                let cleanupTemporaryFiles = {
-                    try? FileManager.default.removeItem(at: snippetURL)
-                    try? FileManager.default.removeItem(at: runnerURL)
-                    try? FileManager.default.removeItem(at: metricsURL)
-                }
+        let cleanupTemporaryFiles = {
+            try? FileManager.default.removeItem(at: snippetURL)
+            try? FileManager.default.removeItem(at: runnerURL)
+            try? FileManager.default.removeItem(at: metricsURL)
+        }
 
-                let process = Process()
-                let stdoutPipe = Pipe()
-                let stderrPipe = Pipe()
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
 
-                process.currentDirectoryURL = projectURL
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-                process.arguments = ["php", runnerFileName]
-                process.standardOutput = stdoutPipe
-                process.standardError = stderrPipe
+        process.currentDirectoryURL = projectURL
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["php", runnerFileName]
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
 
-                let runID = UUID()
+        let runID = UUID()
 
-                do {
-                    beginActiveExecution(process: process, runID: runID)
-                    try process.run()
-                    process.waitUntilExit()
+        do {
+            beginActiveExecution(process: process, runID: runID)
+            try process.run()
+            process.waitUntilExit()
 
-                    let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                    let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                    let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-                    let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-                    let runtimeMetrics = readRuntimeMetrics(from: metricsURL)
-                    let stoppedByRequest = endActiveExecution(runID)
-                    let stoppedBySignal = process.terminationReason == .uncaughtSignal &&
-                        (process.terminationStatus == SIGTERM || process.terminationStatus == SIGINT)
-                    cleanupTemporaryFiles()
+            let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+            let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
+            let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+            let runtimeMetrics = Self.readRuntimeMetrics(from: metricsURL)
+            let stoppedByRequest = endActiveExecution(runID)
+            let stoppedBySignal = process.terminationReason == .uncaughtSignal &&
+                (process.terminationStatus == SIGTERM || process.terminationStatus == SIGINT)
+            cleanupTemporaryFiles()
 
-                    continuation.resume(returning: PHPExecutionResult(
-                        command: "php \(runnerFileName)",
-                        stdout: stdout,
-                        stderr: stderr,
-                        exitCode: process.terminationStatus,
-                        durationMs: runtimeMetrics?.durationMs,
-                        peakMemoryBytes: runtimeMetrics?.peakMemoryBytes,
-                        wasStopped: stoppedByRequest || stoppedBySignal
-                    ))
-                } catch {
-                    _ = endActiveExecution(runID)
-                    cleanupTemporaryFiles()
-                    continuation.resume(returning: PHPExecutionResult(
-                        command: "php \(runnerFileName)",
-                        stdout: "",
-                        stderr: "Failed to run PHP process: \(error.localizedDescription)",
-                        exitCode: 1,
-                        durationMs: nil,
-                        peakMemoryBytes: nil,
-                        wasStopped: false
-                    ))
-                }
-            }
+            return PHPExecutionResult(
+                command: "php \(runnerFileName)",
+                stdout: stdout,
+                stderr: stderr,
+                exitCode: process.terminationStatus,
+                durationMs: runtimeMetrics?.durationMs,
+                peakMemoryBytes: runtimeMetrics?.peakMemoryBytes,
+                wasStopped: stoppedByRequest || stoppedBySignal
+            )
+        } catch {
+            _ = endActiveExecution(runID)
+            cleanupTemporaryFiles()
+            return PHPExecutionResult(
+                command: "php \(runnerFileName)",
+                stdout: "",
+                stderr: "Failed to run PHP process: \(error.localizedDescription)",
+                exitCode: 1,
+                durationMs: nil,
+                peakMemoryBytes: nil,
+                wasStopped: false
+            )
         }
     }
 
-    static func stop() {
-        let processToStop: Process?
-
-        activeStateLock.lock()
+    func stop() {
         if let runID = activeRunID {
             stopRequestedRunIDs.insert(runID)
         }
-        processToStop = activeProcess
-        activeStateLock.unlock()
 
-        guard let processToStop, processToStop.isRunning else { return }
+        guard let processToStop = activeProcess, processToStop.isRunning else { return }
         processToStop.interrupt()
         DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.2) {
             if processToStop.isRunning {
@@ -218,18 +206,13 @@ try {
         return try? JSONDecoder().decode(RuntimeMetrics.self, from: data)
     }
 
-    private static func beginActiveExecution(process: Process, runID: UUID) {
-        activeStateLock.lock()
+    private func beginActiveExecution(process: Process, runID: UUID) {
         activeProcess = process
         activeRunID = runID
-        activeStateLock.unlock()
     }
 
     @discardableResult
-    private static func endActiveExecution(_ runID: UUID) -> Bool {
-        activeStateLock.lock()
-        defer { activeStateLock.unlock() }
-
+    private func endActiveExecution(_ runID: UUID) -> Bool {
         let wasStopped = stopRequestedRunIDs.remove(runID) != nil
         if activeRunID == runID {
             activeRunID = nil

@@ -16,7 +16,7 @@ struct RunMetrics {
 
 @MainActor
 @Observable
-final class TinkerSwiftState {
+final class AppModel {
     private enum DefaultsKey {
         static let appUIScale = "app.uiScale"
         static let showLineNumbers = "editor.showLineNumbers"
@@ -26,26 +26,6 @@ final class TinkerSwiftState {
         static let laravelProjectPath = "laravel.projectPath"
         static let laravelProjectsJSON = "laravel.projectsJSON"
     }
-
-    private static let memoryFormatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .memory
-        formatter.allowedUnits = [.useKB, .useMB, .useGB]
-        formatter.includesUnit = true
-        formatter.isAdaptive = true
-        return formatter
-    }()
-
-    private static let defaultCode = """
-use App\\Models\\User;
-
-$users = User::query()
-    ->latest()
-    ->take(5)
-    ->get(['id', 'name', 'email']);
-
-return $users->toJson();
-"""
 
     private let defaults: UserDefaults
 
@@ -69,20 +49,9 @@ return $users->toJson();
         didSet { defaults.set(syntaxHighlighting, forKey: DefaultsKey.syntaxHighlighting) }
     }
 
-    var laravelProjectPath: String {
-        didSet { defaults.set(laravelProjectPath, forKey: DefaultsKey.laravelProjectPath) }
-    }
-
     var projects: [LaravelProject] {
         didSet { persistProjects(projects) }
     }
-
-    var columnVisibility: NavigationSplitViewVisibility = .detailOnly
-    var isPickingProjectFolder = false
-    var isRunning = false
-    var lastRunMetrics: RunMetrics?
-    var code = defaultCode
-    var result = "Press Run to execute code."
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -97,14 +66,9 @@ return $users->toJson();
         var initialProjects = Self.decodeProjects(from: savedProjectsJSON)
 
         let savedProjectPath = Self.normalizeProjectPath(defaults.string(forKey: DefaultsKey.laravelProjectPath) ?? "")
-        if !savedProjectPath.isEmpty {
-            if !initialProjects.contains(where: { $0.path == savedProjectPath }) {
-                initialProjects.append(LaravelProject(path: savedProjectPath))
-                initialProjects.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-            }
-            laravelProjectPath = savedProjectPath
-        } else {
-            laravelProjectPath = initialProjects.first?.path ?? ""
+        if !savedProjectPath.isEmpty, !initialProjects.contains(where: { $0.path == savedProjectPath }) {
+            initialProjects.append(LaravelProject(path: savedProjectPath))
+            initialProjects.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         }
 
         projects = initialProjects
@@ -114,9 +78,137 @@ return $users->toJson();
         CGFloat(max(0.6, min(appUIScale, 3.0)))
     }
 
+    var lastSelectedProjectPath: String {
+        Self.normalizeProjectPath(defaults.string(forKey: DefaultsKey.laravelProjectPath) ?? "")
+    }
+
+    func setLastSelectedProjectPath(_ path: String) {
+        defaults.set(Self.normalizeProjectPath(path), forKey: DefaultsKey.laravelProjectPath)
+    }
+
+    func addProject(_ path: String) {
+        let normalizedPath = Self.normalizeProjectPath(path)
+        guard !normalizedPath.isEmpty else { return }
+
+        if !projects.contains(where: { $0.path == normalizedPath }) {
+            projects.append(LaravelProject(path: normalizedPath))
+            projects.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        }
+    }
+
+    private func persistProjects(_ projects: [LaravelProject]) {
+        let encoder = JSONEncoder()
+        guard let data = try? encoder.encode(projects),
+              let json = String(data: data, encoding: .utf8) else {
+            return
+        }
+
+        defaults.set(json, forKey: DefaultsKey.laravelProjectsJSON)
+    }
+
+    private static func decodeProjects(from json: String) -> [LaravelProject] {
+        guard let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([LaravelProject].self, from: data) else {
+            return []
+        }
+
+        var seen = Set<String>()
+        return decoded.compactMap { project in
+            let normalizedPath = normalizeProjectPath(project.path)
+            guard !normalizedPath.isEmpty else { return nil }
+            guard seen.insert(normalizedPath).inserted else { return nil }
+            return LaravelProject(path: normalizedPath)
+        }
+    }
+
+    private static func normalizeProjectPath(_ raw: String) -> String {
+        var normalized = URL(fileURLWithPath: raw).standardizedFileURL.path
+        while normalized.count > 1 && normalized.hasSuffix("/") {
+            normalized.removeLast()
+        }
+        return normalized
+    }
+}
+
+@MainActor
+@Observable
+final class WorkspaceState {
+    private static let memoryFormatter: ByteCountFormatter = {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .memory
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        formatter.includesUnit = true
+        formatter.isAdaptive = true
+        return formatter
+    }()
+
+    private static let defaultCode = """
+use App\\Models\\User;
+
+$users = User::query()
+    ->latest()
+    ->take(5)
+    ->get(['id', 'name', 'email']);
+
+return $users->toJson();
+"""
+
+    let appModel: AppModel
+    private let runner = PHPExecutionRunner()
+
+    var columnVisibility: NavigationSplitViewVisibility = .detailOnly
+    var isPickingProjectFolder = false
+    var isRunning = false
+    var lastRunMetrics: RunMetrics?
+    var code = defaultCode
+    var result = "Press Run to execute code."
+    var laravelProjectPath: String {
+        didSet { appModel.setLastSelectedProjectPath(laravelProjectPath) }
+    }
+
+    init(appModel: AppModel) {
+        self.appModel = appModel
+        laravelProjectPath = appModel.lastSelectedProjectPath.isEmpty ? (appModel.projects.first?.path ?? "") : appModel.lastSelectedProjectPath
+    }
+
+    deinit {
+        let runner = self.runner
+        Task {
+            await runner.stop()
+        }
+    }
+
+    var scale: CGFloat {
+        appModel.scale
+    }
+
+    var showLineNumbers: Bool {
+        get { appModel.showLineNumbers }
+        set { appModel.showLineNumbers = newValue }
+    }
+
+    var wrapLines: Bool {
+        get { appModel.wrapLines }
+        set { appModel.wrapLines = newValue }
+    }
+
+    var highlightSelectedLine: Bool {
+        get { appModel.highlightSelectedLine }
+        set { appModel.highlightSelectedLine = newValue }
+    }
+
+    var syntaxHighlighting: Bool {
+        get { appModel.syntaxHighlighting }
+        set { appModel.syntaxHighlighting = newValue }
+    }
+
+    var projects: [LaravelProject] {
+        appModel.projects
+    }
+
     var selectedProjectName: String {
         guard !laravelProjectPath.isEmpty else { return "No project selected" }
-        if let project = projects.first(where: { $0.path == laravelProjectPath }) {
+        if let project = appModel.projects.first(where: { $0.path == laravelProjectPath }) {
             return project.name
         }
         return URL(fileURLWithPath: laravelProjectPath).lastPathComponent
@@ -158,15 +250,11 @@ return $users->toJson();
     }
 
     func addProject(_ path: String) {
-        let normalizedPath = Self.normalizeProjectPath(path)
-        guard !normalizedPath.isEmpty else { return }
-
-        if !projects.contains(where: { $0.path == normalizedPath }) {
-            projects.append(LaravelProject(path: normalizedPath))
-            projects.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        appModel.addProject(path)
+        let normalizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
+        if appModel.projects.contains(where: { $0.path == normalizedPath }) {
+            laravelProjectPath = normalizedPath
         }
-
-        laravelProjectPath = normalizedPath
     }
 
     private func executeRunCode() async {
@@ -178,7 +266,7 @@ return $users->toJson();
         isRunning = true
         defer { isRunning = false }
 
-        let execution = await PHPExecutionService.run(code: code, projectPath: laravelProjectPath)
+        let execution = await runner.run(code: code, projectPath: laravelProjectPath)
         let stdout = execution.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         let stderr = execution.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -207,41 +295,10 @@ return $users->toJson();
     }
 
     private func stopRunningScript() {
-        PHPExecutionService.stop()
+        Task {
+            await runner.stop()
+        }
         result = "Stopping script..."
-    }
-
-    private func persistProjects(_ projects: [LaravelProject]) {
-        let encoder = JSONEncoder()
-        guard let data = try? encoder.encode(projects),
-              let json = String(data: data, encoding: .utf8) else {
-            return
-        }
-
-        defaults.set(json, forKey: DefaultsKey.laravelProjectsJSON)
-    }
-
-    private static func decodeProjects(from json: String) -> [LaravelProject] {
-        guard let data = json.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([LaravelProject].self, from: data) else {
-            return []
-        }
-
-        var seen = Set<String>()
-        return decoded.compactMap { project in
-            let normalizedPath = normalizeProjectPath(project.path)
-            guard !normalizedPath.isEmpty else { return nil }
-            guard seen.insert(normalizedPath).inserted else { return nil }
-            return LaravelProject(path: normalizedPath)
-        }
-    }
-
-    private static func normalizeProjectPath(_ raw: String) -> String {
-        var normalized = URL(fileURLWithPath: raw).standardizedFileURL.path
-        while normalized.count > 1 && normalized.hasSuffix("/") {
-            normalized.removeLast()
-        }
-        return normalized
     }
 
     private func formatDuration(_ durationMs: Double) -> String {

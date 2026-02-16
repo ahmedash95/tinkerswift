@@ -1,19 +1,19 @@
 import SwiftUI
 
 struct ProjectSidebarView: View {
-    @Environment(TinkerSwiftState.self) private var appState
+    @Environment(WorkspaceState.self) private var workspaceState
 
     var body: some View {
-        @Bindable var appState = appState
+        @Bindable var workspaceState = workspaceState
 
         VStack(spacing: 0) {
-            List(selection: $appState.laravelProjectPath) {
+            List(selection: $workspaceState.laravelProjectPath) {
                 Section("Projects") {
-                    if appState.projects.isEmpty {
+                    if workspaceState.projects.isEmpty {
                         Text("No projects added")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(appState.projects) { project in
+                        ForEach(workspaceState.projects) { project in
                             Label(project.name, systemImage: "folder")
                                 .tag(project.path)
                         }
@@ -25,7 +25,7 @@ struct ProjectSidebarView: View {
             Divider()
 
             HStack {
-                Button(action: { appState.isPickingProjectFolder = true }) {
+                Button(action: { workspaceState.isPickingProjectFolder = true }) {
                     Label("Add Project", systemImage: "folder.badge.plus")
                 }
                 .buttonStyle(.plain)

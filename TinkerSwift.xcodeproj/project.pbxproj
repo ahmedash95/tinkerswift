@@ -20,6 +20,8 @@
 		B1C29B9E5FB3E66BAA809905 /* ProjectSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1EC35E5E2B4AD47E6CD99B1 /* ProjectSidebarView.swift */; };
 		D3D4C941638D44660478ABB8 /* STTextView in Frameworks */ = {isa = PBXBuildFile; productRef = D97CADF26E40B2AAF2540EF7 /* STTextView */; };
 		D77CB2CA91C6B2466388DDA9 /* TinkerSwiftApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7C47FE7E31C32BEEF95CB4 /* TinkerSwiftApp.swift */; };
+		E5BFC27A630BCDE87162912E /* WorkspaceWindowFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20CA221126C370AB32A0D91 /* WorkspaceWindowFactory.swift */; };
+		FBF92F6B0DD066AD137046F3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0FFC7EED87D1C94F2A0A3BA /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,9 +33,11 @@
 		896AA6D6A28BA0BDDB5C2A86 /* STTextView-Plugin-Neon */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "STTextView-Plugin-Neon"; path = "Vendor/STTextView-Plugin-Neon"; sourceTree = SOURCE_ROOT; };
 		9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPExecutionService.swift; sourceTree = "<group>"; };
 		A1EC35E5E2B4AD47E6CD99B1 /* ProjectSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectSidebarView.swift; sourceTree = "<group>"; };
+		A20CA221126C370AB32A0D91 /* WorkspaceWindowFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceWindowFactory.swift; sourceTree = "<group>"; };
 		BE1DE4774A9619733B2B7024 /* AppKitCodeEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitCodeEditor.swift; sourceTree = "<group>"; };
 		C2CE3011C05D1288AB735216 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		CA41881C1CDF7F49F88F2711 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E0FFC7EED87D1C94F2A0A3BA /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		E586EF248F30C2CD75ABA8A7 /* TinkerSwiftState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TinkerSwiftState.swift; sourceTree = "<group>"; };
 		FA7C47FE7E31C32BEEF95CB4 /* TinkerSwiftApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TinkerSwiftApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -79,11 +83,13 @@
 		A07BB4D64935180AAFD86CEB /* TinkerSwift */ = {
 			isa = PBXGroup;
 			children = (
+				E0FFC7EED87D1C94F2A0A3BA /* AppDelegate.swift */,
 				CA41881C1CDF7F49F88F2711 /* Assets.xcassets */,
 				C2CE3011C05D1288AB735216 /* ContentView.swift */,
 				9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */,
 				681EE17BA70F9CAE63E1797F /* SettingsView.swift */,
 				FA7C47FE7E31C32BEEF95CB4 /* TinkerSwiftApp.swift */,
+				A20CA221126C370AB32A0D91 /* WorkspaceWindowFactory.swift */,
 				46718E352D49812C3EE86757 /* State */,
 				A14755A640BD23A122BE1A5E /* Views */,
 			);
@@ -188,6 +194,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FBF92F6B0DD066AD137046F3 /* AppDelegate.swift in Sources */,
 				445CC1FD2078345E2201501D /* AppKitCodeEditor.swift in Sources */,
 				917F845542B9FDBCE23A1635 /* ContentView.swift in Sources */,
 				010775AB09E90EB72A6C60AC /* EditorPaneView.swift in Sources */,
@@ -198,6 +205,7 @@
 				99017869037F7E3C14147365 /* SettingsView.swift in Sources */,
 				D77CB2CA91C6B2466388DDA9 /* TinkerSwiftApp.swift in Sources */,
 				1E7D3EB22066CF47130B6446 /* TinkerSwiftState.swift in Sources */,
+				E5BFC27A630BCDE87162912E /* WorkspaceWindowFactory.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

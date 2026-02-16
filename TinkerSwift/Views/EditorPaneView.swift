@@ -1,18 +1,18 @@
 import SwiftUI
 
 struct EditorPaneView: View {
-    @Environment(TinkerSwiftState.self) private var appState
+    @Environment(WorkspaceState.self) private var workspaceState
 
     var body: some View {
-        @Bindable var appState = appState
+        @Bindable var workspaceState = workspaceState
 
         AppKitCodeEditor(
-            text: $appState.code,
-            fontSize: 14 * appState.scale,
-            showLineNumbers: appState.showLineNumbers,
-            wrapLines: appState.wrapLines,
-            highlightSelectedLine: appState.highlightSelectedLine,
-            syntaxHighlighting: appState.syntaxHighlighting
+            text: $workspaceState.code,
+            fontSize: 14 * workspaceState.scale,
+            showLineNumbers: workspaceState.showLineNumbers,
+            wrapLines: workspaceState.wrapLines,
+            highlightSelectedLine: workspaceState.highlightSelectedLine,
+            syntaxHighlighting: workspaceState.syntaxHighlighting
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
