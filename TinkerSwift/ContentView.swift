@@ -198,7 +198,7 @@ return $users->toJson();
     }
 
     private func addProject(_ path: String) {
-        let normalizedPath = URL(fileURLWithPath: path).path()
+        let normalizedPath = normalizeProjectPath(path)
         var updated = projects
         if !updated.contains(where: { $0.path == normalizedPath }) {
             updated.append(LaravelProject(path: normalizedPath))
@@ -225,7 +225,20 @@ return $users->toJson();
         }
         // Keep order stable and deduplicate by path.
         var seen = Set<String>()
-        return decoded.filter { seen.insert($0.path).inserted }
+        return decoded.compactMap { project in
+            let normalizedPath = normalizeProjectPath(project.path)
+            guard !normalizedPath.isEmpty else { return nil }
+            guard seen.insert(normalizedPath).inserted else { return nil }
+            return LaravelProject(path: normalizedPath)
+        }
+    }
+
+    private func normalizeProjectPath(_ raw: String) -> String {
+        var normalized = URL(fileURLWithPath: raw).standardizedFileURL.path
+        while normalized.count > 1 && normalized.hasSuffix("/") {
+            normalized.removeLast()
+        }
+        return normalized
     }
 
     private func formatDuration(_ durationMs: Double) -> String {
@@ -260,6 +273,7 @@ private struct ReplWorkspace: View {
         HSplitView {
             EditorPane(
                 code: $code,
+                projectPath: selectedProjectPath,
                 contentScale: contentScale,
                 showLineNumbers: showLineNumbers,
                 wrapLines: wrapLines,
@@ -319,6 +333,7 @@ private struct ReplWorkspace: View {
 
 private struct EditorPane: View {
     @Binding var code: String
+    let projectPath: String
     let contentScale: CGFloat
     let showLineNumbers: Bool
     let wrapLines: Bool
@@ -336,7 +351,7 @@ private struct EditorPane: View {
             syntaxHighlighting: syntaxHighlighting,
             colorScheme: colorScheme
         )
-            .id("editor-\(showLineNumbers)-\(wrapLines)-\(highlightSelectedLine)-\(syntaxHighlighting)-\(colorScheme.rawValue)")
+            .id("editor-\(showLineNumbers)-\(wrapLines)-\(highlightSelectedLine)-\(syntaxHighlighting)-\(colorScheme.rawValue)-\(projectPath)")
             .padding(12)
             .background(Color(nsColor: .textBackgroundColor))
     }
