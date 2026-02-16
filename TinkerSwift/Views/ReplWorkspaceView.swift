@@ -15,6 +15,32 @@ struct ReplWorkspaceView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
+                Menu {
+                    if workspaceState.projects.isEmpty {
+                        Text("No projects added")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(workspaceState.projects) { project in
+                            Button {
+                                workspaceState.laravelProjectPath = project.path
+                            } label: {
+                                Label(project.name, systemImage: workspaceState.laravelProjectPath == project.path ? "checkmark" : "folder")
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    Button {
+                        workspaceState.isPickingProjectFolder = true
+                    } label: {
+                        Label("Add Project", systemImage: "folder.badge.plus")
+                    }
+                } label: {
+                    Image(systemName: "folder")
+                }
+                .help("Switch Project")
+
                 Button(action: workspaceState.toggleRunStop) {
                     Label(workspaceState.isRunning ? "Stop" : "Run", systemImage: workspaceState.isRunning ? "stop.fill" : "play.fill")
                 }
