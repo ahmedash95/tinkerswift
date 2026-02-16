@@ -12,13 +12,8 @@ struct EditorPaneView: View {
             showLineNumbers: appState.showLineNumbers,
             wrapLines: appState.wrapLines,
             highlightSelectedLine: appState.highlightSelectedLine,
-            syntaxHighlighting: appState.syntaxHighlighting,
-            colorScheme: appState.editorColorScheme
+            syntaxHighlighting: appState.syntaxHighlighting
         )
-        .id(
-            "editor-\(appState.showLineNumbers)-\(appState.wrapLines)-\(appState.highlightSelectedLine)-\(appState.syntaxHighlighting)-\(appState.editorColorScheme.rawValue)-\(appState.laravelProjectPath)"
-        )
-        .padding(12)
-        .background(Color(nsColor: .textBackgroundColor))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }

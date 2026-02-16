@@ -22,7 +22,7 @@ struct ContentView: View {
             guard case let .success(urls) = result, let url = urls.first else { return }
             appState.addProject(url.path)
         }
-        .focusedSceneValue(\.runCodeAction, appState.runCode)
+        .focusedSceneValue(\.runCodeAction, appState.toggleRunStop)
     }
 }
 

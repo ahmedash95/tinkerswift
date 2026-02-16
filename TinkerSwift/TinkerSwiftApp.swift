@@ -18,7 +18,7 @@ private struct TinkerSwiftCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Run") {
-            Button("Run Code") {
+            Button(appState.isRunning ? "Stop Script" : "Run Code") {
                 runCodeAction?()
             }
             .keyboardShortcut("r", modifiers: [.command])

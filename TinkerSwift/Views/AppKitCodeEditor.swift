@@ -9,16 +9,16 @@ struct AppKitCodeEditor: NSViewRepresentable {
     let wrapLines: Bool
     let highlightSelectedLine: Bool
     let syntaxHighlighting: Bool
-    let colorScheme: EditorColorScheme
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = STTextView.scrollableTextView()
-        let textView = scrollView.documentView as! STTextView
+        let scrollView = CodePaneTextView.scrollableTextView()
+        let textView = scrollView.documentView as! CodePaneTextView
 
+        context.coordinator.attachEditorTextView(textView)
         textView.textDelegate = context.coordinator
         textView.textColor = .textColor
         textView.backgroundColor = .textBackgroundColor
@@ -31,14 +31,18 @@ struct AppKitCodeEditor: NSViewRepresentable {
         textView.gutterView?.drawSeparator = true
 
         context.coordinator.applyEditorFont(fontSize, to: textView, force: true)
-        context.coordinator.installPlugins(on: textView, syntaxHighlighting: syntaxHighlighting, colorScheme: colorScheme)
+        context.coordinator.installPluginsIfNeeded(on: textView)
+        context.coordinator.updateSyntaxHighlighting(syntaxHighlighting, on: textView, force: true)
+        context.coordinator.updateVisualState(on: textView, force: true)
         return scrollView
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let textView = scrollView.documentView as? STTextView else {
+        guard let textView = scrollView.documentView as? CodePaneTextView else {
             return
         }
+
+        context.coordinator.attachEditorTextView(textView)
 
         if (textView.text ?? "") != text {
             context.coordinator.isSyncing = true
@@ -50,9 +54,8 @@ struct AppKitCodeEditor: NSViewRepresentable {
         textView.showsLineNumbers = showLineNumbers
         textView.isHorizontallyResizable = !wrapLines
         context.coordinator.applyEditorFont(fontSize, to: textView)
-        textView.backgroundColor = .textBackgroundColor
-        textView.textColor = .textColor
-        textView.gutterView?.textColor = .secondaryLabelColor
+        context.coordinator.updateSyntaxHighlighting(syntaxHighlighting, on: textView)
+        context.coordinator.updateVisualState(on: textView)
     }
 
     @MainActor
@@ -60,70 +63,40 @@ struct AppKitCodeEditor: NSViewRepresentable {
         @Binding var text: String
         var isSyncing = false
         private var lastAppliedFontSize: CGFloat = 0
-        private var didInstallPlugin = false
+        private weak var textView: CodePaneTextView?
+        private var neonPlugin: NeonPlugin?
+        private var lastSyntaxHighlightingEnabled: Bool?
+        private var lastVisualStateSignature: String?
 
         init(text: Binding<String>) {
             _text = text
         }
 
-        func installPlugins(on textView: STTextView, syntaxHighlighting: Bool, colorScheme: EditorColorScheme) {
-            guard syntaxHighlighting, !didInstallPlugin else { return }
-            let colorOnlyTheme = makeColorOnlyTheme(colorScheme)
-            textView.addPlugin(NeonPlugin(theme: colorOnlyTheme, language: .php))
-            didInstallPlugin = true
+        fileprivate func attachEditorTextView(_ textView: CodePaneTextView) {
+            guard self.textView !== textView else { return }
+
+            self.textView?.onVisualStateChange = nil
+            self.textView = textView
+            textView.onVisualStateChange = { [weak self, weak textView] in
+                guard let self, let textView else { return }
+                self.updateVisualState(on: textView, force: true)
+            }
         }
 
-        private func makeColorOnlyTheme(_ scheme: EditorColorScheme) -> Theme {
-            switch scheme {
-            case .default:
-                return Theme(colors: Theme.default.colors, fonts: Theme.Fonts(fonts: [:]))
-            case .ocean:
-                return Theme(colors: Theme.Colors(colors: [
-                    "plain": NSColor(hex: "#DDEAF7"),
-                    "boolean": NSColor(hex: "#78DCE8"),
-                    "comment": NSColor(hex: "#6B8BAA"),
-                    "constructor": NSColor(hex: "#A6E22E"),
-                    "function.call": NSColor(hex: "#A6E22E"),
-                    "include": NSColor(hex: "#F78C6C"),
-                    "keyword": NSColor(hex: "#C792EA"),
-                    "keyword.function": NSColor(hex: "#C792EA"),
-                    "keyword.return": NSColor(hex: "#C792EA"),
-                    "method": NSColor(hex: "#82AAFF"),
-                    "number": NSColor(hex: "#F78C6C"),
-                    "operator": NSColor(hex: "#89DDFF"),
-                    "parameter": NSColor(hex: "#FFCB6B"),
-                    "punctuation.special": NSColor(hex: "#89DDFF"),
-                    "string": NSColor(hex: "#C3E88D"),
-                    "text.literal": NSColor(hex: "#C3E88D"),
-                    "text.title": NSColor(hex: "#82AAFF"),
-                    "type": NSColor(hex: "#FFCB6B"),
-                    "variable.builtin": NSColor(hex: "#FF5370"),
-                    "variable": NSColor(hex: "#DDEAF7")
-                ]), fonts: Theme.Fonts(fonts: [:]))
-            case .solarized:
-                return Theme(colors: Theme.Colors(colors: [
-                    "plain": NSColor(hex: "#839496"),
-                    "boolean": NSColor(hex: "#2AA198"),
-                    "comment": NSColor(hex: "#586E75"),
-                    "constructor": NSColor(hex: "#B58900"),
-                    "function.call": NSColor(hex: "#268BD2"),
-                    "include": NSColor(hex: "#CB4B16"),
-                    "keyword": NSColor(hex: "#859900"),
-                    "keyword.function": NSColor(hex: "#859900"),
-                    "keyword.return": NSColor(hex: "#859900"),
-                    "method": NSColor(hex: "#268BD2"),
-                    "number": NSColor(hex: "#D33682"),
-                    "operator": NSColor(hex: "#6C71C4"),
-                    "parameter": NSColor(hex: "#B58900"),
-                    "punctuation.special": NSColor(hex: "#6C71C4"),
-                    "string": NSColor(hex: "#2AA198"),
-                    "text.literal": NSColor(hex: "#2AA198"),
-                    "text.title": NSColor(hex: "#268BD2"),
-                    "type": NSColor(hex: "#B58900"),
-                    "variable.builtin": NSColor(hex: "#CB4B16"),
-                    "variable": NSColor(hex: "#839496")
-                ]), fonts: Theme.Fonts(fonts: [:]))
-            }
+        func installPluginsIfNeeded(on textView: STTextView) {
+            guard neonPlugin == nil else { return }
+            let colorOnlyTheme = Theme(colors: Theme.default.colors, fonts: Theme.Fonts(fonts: [:]))
+            let plugin = NeonPlugin(theme: colorOnlyTheme, language: .php)
+            textView.addPlugin(plugin)
+            neonPlugin = plugin
+        }
+
+        func updateSyntaxHighlighting(_ enabled: Bool, on textView: STTextView, force: Bool = false) {
+            installPluginsIfNeeded(on: textView)
+            guard force || lastSyntaxHighlightingEnabled != enabled else { return }
+
+            lastSyntaxHighlightingEnabled = enabled
+            neonPlugin?.setHighlightingEnabled(enabled)
         }
 
         func applyEditorFont(_ size: CGFloat, to textView: STTextView, force: Bool = false) {
@@ -132,12 +105,6 @@ struct AppKitCodeEditor: NSViewRepresentable {
 
             let font = NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
             textView.font = font
-
-            let length = (textView.text ?? "").utf16.count
-            if length > 0 {
-                textView.addAttributes([.font: font], range: NSRange(location: 0, length: length))
-            }
-
             textView.gutterView?.font = font
         }
 
@@ -148,18 +115,108 @@ struct AppKitCodeEditor: NSViewRepresentable {
 
             text = textView.text ?? ""
         }
+
+        func updateVisualState(on textView: STTextView, force: Bool = false) {
+            let currentSignature = visualStateSignature(for: textView)
+            guard force || currentSignature != lastVisualStateSignature else {
+                return
+            }
+
+            lastVisualStateSignature = currentSignature
+
+            textView.effectiveAppearance.performAsCurrentDrawingAppearance {
+                textView.backgroundColor = .textBackgroundColor
+                textView.textColor = .textColor
+                textView.insertionPointColor = .textColor
+                textView.gutterView?.textColor = .secondaryLabelColor
+                textView.gutterView?.drawSeparator = true
+            }
+            textView.needsLayout = true
+            textView.needsDisplay = true
+            textView.gutterView?.needsDisplay = true
+
+            neonPlugin?.refreshHighlightingForAppearanceChange()
+        }
+
+        private func visualStateSignature(for textView: STTextView) -> String {
+            let appearanceName = textView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua, .vibrantDark, .vibrantLight])?.rawValue
+                ?? textView.effectiveAppearance.name.rawValue
+            let keyState = textView.window?.isKeyWindow == true ? "key" : "not-key"
+            let activeState = NSApp.isActive ? "active" : "inactive"
+            return "\(appearanceName)|\(keyState)|\(activeState)"
+        }
     }
 }
 
-private extension NSColor {
-    convenience init(hex: String) {
-        let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var value: UInt64 = 0
-        Scanner(string: cleaned).scanHexInt64(&value)
+fileprivate final class CodePaneTextView: STTextView {
+    var onVisualStateChange: (() -> Void)?
+    private weak var observedWindow: NSWindow?
 
-        let r = CGFloat((value >> 16) & 0xFF) / 255.0
-        let g = CGFloat((value >> 8) & 0xFF) / 255.0
-        let b = CGFloat(value & 0xFF) / 255.0
-        self.init(red: r, green: g, blue: b, alpha: 1.0)
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        reconfigureObservers()
+        notifyVisualStateChanged()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        notifyVisualStateChanged()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    private func reconfigureObservers() {
+        let center = NotificationCenter.default
+
+        if let observedWindow {
+            center.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: observedWindow)
+            center.removeObserver(self, name: NSWindow.didResignKeyNotification, object: observedWindow)
+        }
+        center.removeObserver(self, name: NSApplication.didBecomeActiveNotification, object: NSApp)
+        center.removeObserver(self, name: NSApplication.didResignActiveNotification, object: NSApp)
+
+        if let window {
+            observedWindow = window
+            center.addObserver(
+                self,
+                selector: #selector(handleVisualStateNotification(_:)),
+                name: NSWindow.didBecomeKeyNotification,
+                object: window
+            )
+            center.addObserver(
+                self,
+                selector: #selector(handleVisualStateNotification(_:)),
+                name: NSWindow.didResignKeyNotification,
+                object: window
+            )
+        } else {
+            observedWindow = nil
+        }
+
+        center.addObserver(
+            self,
+            selector: #selector(handleVisualStateNotification(_:)),
+            name: NSApplication.didBecomeActiveNotification,
+            object: NSApp
+        )
+        center.addObserver(
+            self,
+            selector: #selector(handleVisualStateNotification(_:)),
+            name: NSApplication.didResignActiveNotification,
+            object: NSApp
+        )
+    }
+
+    @objc
+    private func handleVisualStateNotification(_ notification: Notification) {
+        notifyVisualStateChanged()
+    }
+
+    private func notifyVisualStateChanged() {
+        DispatchQueue.main.async { [weak self] in
+            self?.onVisualStateChange?()
+        }
     }
 }

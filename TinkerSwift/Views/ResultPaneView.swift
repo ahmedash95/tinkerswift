@@ -29,7 +29,6 @@ struct ResultPaneView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .textBackgroundColor))
     }
 }
 

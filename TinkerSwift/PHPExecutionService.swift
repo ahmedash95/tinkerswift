@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 struct PHPExecutionResult {
     let command: String
@@ -7,6 +8,7 @@ struct PHPExecutionResult {
     let exitCode: Int32
     let durationMs: Double?
     let peakMemoryBytes: UInt64?
+    let wasStopped: Bool
 }
 
 enum PHPExecutionService {
@@ -14,6 +16,11 @@ enum PHPExecutionService {
         let durationMs: Double
         let peakMemoryBytes: UInt64
     }
+    
+    private static let activeStateLock = NSLock()
+    nonisolated(unsafe) private static var activeProcess: Process?
+    nonisolated(unsafe) private static var activeRunID: UUID?
+    nonisolated(unsafe) private static var stopRequestedRunIDs = Set<UUID>()
 
     static func run(code: String, projectPath: String) async -> PHPExecutionResult {
         await withCheckedContinuation { continuation in
@@ -28,7 +35,8 @@ enum PHPExecutionService {
                         stderr: "No artisan file found at: \(artisanURL.path())",
                         exitCode: 127,
                         durationMs: nil,
-                        peakMemoryBytes: nil
+                        peakMemoryBytes: nil,
+                        wasStopped: false
                     ))
                     return
                 }
@@ -105,7 +113,8 @@ try {
                         stderr: "Failed to create temporary PHP files: \(error.localizedDescription)",
                         exitCode: 1,
                         durationMs: nil,
-                        peakMemoryBytes: nil
+                        peakMemoryBytes: nil,
+                        wasStopped: false
                     ))
                     return
                 }
@@ -126,7 +135,10 @@ try {
                 process.standardOutput = stdoutPipe
                 process.standardError = stderrPipe
 
+                let runID = UUID()
+
                 do {
+                    beginActiveExecution(process: process, runID: runID)
                     try process.run()
                     process.waitUntilExit()
 
@@ -135,6 +147,9 @@ try {
                     let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
                     let stderr = String(data: stderrData, encoding: .utf8) ?? ""
                     let runtimeMetrics = readRuntimeMetrics(from: metricsURL)
+                    let stoppedByRequest = endActiveExecution(runID)
+                    let stoppedBySignal = process.terminationReason == .uncaughtSignal &&
+                        (process.terminationStatus == SIGTERM || process.terminationStatus == SIGINT)
                     cleanupTemporaryFiles()
 
                     continuation.resume(returning: PHPExecutionResult(
@@ -143,9 +158,11 @@ try {
                         stderr: stderr,
                         exitCode: process.terminationStatus,
                         durationMs: runtimeMetrics?.durationMs,
-                        peakMemoryBytes: runtimeMetrics?.peakMemoryBytes
+                        peakMemoryBytes: runtimeMetrics?.peakMemoryBytes,
+                        wasStopped: stoppedByRequest || stoppedBySignal
                     ))
                 } catch {
+                    _ = endActiveExecution(runID)
                     cleanupTemporaryFiles()
                     continuation.resume(returning: PHPExecutionResult(
                         command: "php \(runnerFileName)",
@@ -153,9 +170,29 @@ try {
                         stderr: "Failed to run PHP process: \(error.localizedDescription)",
                         exitCode: 1,
                         durationMs: nil,
-                        peakMemoryBytes: nil
+                        peakMemoryBytes: nil,
+                        wasStopped: false
                     ))
                 }
+            }
+        }
+    }
+
+    static func stop() {
+        let processToStop: Process?
+
+        activeStateLock.lock()
+        if let runID = activeRunID {
+            stopRequestedRunIDs.insert(runID)
+        }
+        processToStop = activeProcess
+        activeStateLock.unlock()
+
+        guard let processToStop, processToStop.isRunning else { return }
+        processToStop.interrupt()
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.2) {
+            if processToStop.isRunning {
+                processToStop.terminate()
             }
         }
     }
@@ -179,5 +216,25 @@ try {
             return nil
         }
         return try? JSONDecoder().decode(RuntimeMetrics.self, from: data)
+    }
+
+    private static func beginActiveExecution(process: Process, runID: UUID) {
+        activeStateLock.lock()
+        activeProcess = process
+        activeRunID = runID
+        activeStateLock.unlock()
+    }
+
+    @discardableResult
+    private static func endActiveExecution(_ runID: UUID) -> Bool {
+        activeStateLock.lock()
+        defer { activeStateLock.unlock() }
+
+        let wasStopped = stopRequestedRunIDs.remove(runID) != nil
+        if activeRunID == runID {
+            activeRunID = nil
+            activeProcess = nil
+        }
+        return wasStopped
     }
 }

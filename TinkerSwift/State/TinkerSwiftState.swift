@@ -23,7 +23,6 @@ final class TinkerSwiftState {
         static let wrapLines = "editor.wrapLines"
         static let highlightSelectedLine = "editor.highlightSelectedLine"
         static let syntaxHighlighting = "editor.syntaxHighlighting"
-        static let editorColorScheme = "editor.colorScheme"
         static let laravelProjectPath = "laravel.projectPath"
         static let laravelProjectsJSON = "laravel.projectsJSON"
     }
@@ -70,10 +69,6 @@ return $users->toJson();
         didSet { defaults.set(syntaxHighlighting, forKey: DefaultsKey.syntaxHighlighting) }
     }
 
-    var editorColorScheme: EditorColorScheme {
-        didSet { defaults.set(editorColorScheme.rawValue, forKey: DefaultsKey.editorColorScheme) }
-    }
-
     var laravelProjectPath: String {
         didSet { defaults.set(laravelProjectPath, forKey: DefaultsKey.laravelProjectPath) }
     }
@@ -97,9 +92,6 @@ return $users->toJson();
         wrapLines = defaults.object(forKey: DefaultsKey.wrapLines) as? Bool ?? true
         highlightSelectedLine = defaults.object(forKey: DefaultsKey.highlightSelectedLine) as? Bool ?? true
         syntaxHighlighting = defaults.object(forKey: DefaultsKey.syntaxHighlighting) as? Bool ?? true
-
-        let rawScheme = defaults.string(forKey: DefaultsKey.editorColorScheme) ?? EditorColorScheme.default.rawValue
-        editorColorScheme = EditorColorScheme(rawValue: rawScheme) ?? .default
 
         let savedProjectsJSON = defaults.string(forKey: DefaultsKey.laravelProjectsJSON) ?? "[]"
         var initialProjects = Self.decodeProjects(from: savedProjectsJSON)
@@ -150,6 +142,14 @@ return $users->toJson();
         return Self.memoryFormatter.string(fromByteCount: Int64(metrics.peakMemoryBytes))
     }
 
+    func toggleRunStop() {
+        if isRunning {
+            stopRunningScript()
+        } else {
+            runCode()
+        }
+    }
+
     func runCode() {
         guard !isRunning else { return }
         Task { [weak self] in
@@ -182,6 +182,12 @@ return $users->toJson();
         let stdout = execution.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         let stderr = execution.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        if execution.wasStopped {
+            lastRunMetrics = nil
+            result = "Execution stopped."
+            return
+        }
+
         if let durationMs = execution.durationMs,
            let peakMemoryBytes = execution.peakMemoryBytes {
             lastRunMetrics = RunMetrics(durationMs: durationMs, peakMemoryBytes: peakMemoryBytes)
@@ -198,6 +204,11 @@ return $users->toJson();
         } else {
             result = "(empty)"
         }
+    }
+
+    private func stopRunningScript() {
+        PHPExecutionService.stop()
+        result = "Stopping script..."
     }
 
     private func persistProjects(_ projects: [LaravelProject]) {
