@@ -8,15 +8,19 @@
 
 /* Begin PBXBuildFile section */
 		297DB11570450B821E3973B0 /* STTextView-Plugin-Neon in Frameworks */ = {isa = PBXBuildFile; productRef = 57055A4399366F807072010C /* STTextView-Plugin-Neon */; };
+		71C04D5D57B837CA1D54B161 /* EditorPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69E10726DD199C8ACE84BCD1 /* EditorPreferences.swift */; };
 		85DDAF0FB6FFF116D11287D6 /* PHPExecutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */; };
 		917F845542B9FDBCE23A1635 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2CE3011C05D1288AB735216 /* ContentView.swift */; };
 		98012327C79B3EA468725CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CA41881C1CDF7F49F88F2711 /* Assets.xcassets */; };
+		99017869037F7E3C14147365 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 681EE17BA70F9CAE63E1797F /* SettingsView.swift */; };
 		D3D4C941638D44660478ABB8 /* STTextView in Frameworks */ = {isa = PBXBuildFile; productRef = D97CADF26E40B2AAF2540EF7 /* STTextView */; };
 		D77CB2CA91C6B2466388DDA9 /* TinkerSwiftApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7C47FE7E31C32BEEF95CB4 /* TinkerSwiftApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		197A780140CD674D3D057BB7 /* TinkerSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TinkerSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		681EE17BA70F9CAE63E1797F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		69E10726DD199C8ACE84BCD1 /* EditorPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorPreferences.swift; sourceTree = "<group>"; };
 		896AA6D6A28BA0BDDB5C2A86 /* STTextView-Plugin-Neon */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "STTextView-Plugin-Neon"; path = "Vendor/STTextView-Plugin-Neon"; sourceTree = SOURCE_ROOT; };
 		9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPExecutionService.swift; sourceTree = "<group>"; };
 		C2CE3011C05D1288AB735216 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -59,7 +63,9 @@
 			children = (
 				CA41881C1CDF7F49F88F2711 /* Assets.xcassets */,
 				C2CE3011C05D1288AB735216 /* ContentView.swift */,
+				69E10726DD199C8ACE84BCD1 /* EditorPreferences.swift */,
 				9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */,
+				681EE17BA70F9CAE63E1797F /* SettingsView.swift */,
 				FA7C47FE7E31C32BEEF95CB4 /* TinkerSwiftApp.swift */,
 			);
 			path = TinkerSwift;
@@ -152,7 +158,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				917F845542B9FDBCE23A1635 /* ContentView.swift in Sources */,
+				71C04D5D57B837CA1D54B161 /* EditorPreferences.swift in Sources */,
 				85DDAF0FB6FFF116D11287D6 /* PHPExecutionService.swift in Sources */,
+				99017869037F7E3C14147365 /* SettingsView.swift in Sources */,
 				D77CB2CA91C6B2466388DDA9 /* TinkerSwiftApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

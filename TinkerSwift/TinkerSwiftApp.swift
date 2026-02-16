@@ -55,5 +55,9 @@ struct TinkerSwiftApp: App {
         .commands {
             TinkerSwiftCommands(appUIScale: $appUIScale)
         }
+
+        Settings {
+            SettingsView()
+        }
     }
 }

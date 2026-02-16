@@ -25,6 +25,11 @@ struct ContentView: View {
     }()
 
     @AppStorage("app.uiScale") private var appUIScale = 1.0
+    @AppStorage("editor.showLineNumbers") private var showLineNumbers = true
+    @AppStorage("editor.wrapLines") private var wrapLines = true
+    @AppStorage("editor.highlightSelectedLine") private var highlightSelectedLine = true
+    @AppStorage("editor.syntaxHighlighting") private var syntaxHighlighting = true
+    @AppStorage("editor.colorScheme") private var editorColorSchemeRaw = EditorColorScheme.default.rawValue
     @AppStorage("laravel.projectPath") private var laravelProjectPath = ""
     @AppStorage("laravel.projectsJSON") private var laravelProjectsJSON = "[]"
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
@@ -54,6 +59,10 @@ return $users->toJson();
             return project.name
         }
         return URL(fileURLWithPath: laravelProjectPath).lastPathComponent
+    }
+
+    private var editorColorScheme: EditorColorScheme {
+        EditorColorScheme(rawValue: editorColorSchemeRaw) ?? .default
     }
 
     private var executionTimeText: String {
@@ -115,6 +124,11 @@ return $users->toJson();
                 selectedProjectName: selectedProjectName,
                 selectedProjectPath: laravelProjectPath,
                 contentScale: scale,
+                showLineNumbers: showLineNumbers,
+                wrapLines: wrapLines,
+                highlightSelectedLine: highlightSelectedLine,
+                syntaxHighlighting: syntaxHighlighting,
+                colorScheme: editorColorScheme,
                 executionTimeText: executionTimeText,
                 memoryUsageText: memoryUsageText,
                 runAction: runCodeTapped
@@ -233,13 +247,26 @@ private struct ReplWorkspace: View {
     let selectedProjectName: String
     let selectedProjectPath: String
     let contentScale: CGFloat
+    let showLineNumbers: Bool
+    let wrapLines: Bool
+    let highlightSelectedLine: Bool
+    let syntaxHighlighting: Bool
+    let colorScheme: EditorColorScheme
     let executionTimeText: String
     let memoryUsageText: String
     let runAction: () -> Void
 
     var body: some View {
         HSplitView {
-            EditorPane(code: $code, contentScale: contentScale)
+            EditorPane(
+                code: $code,
+                contentScale: contentScale,
+                showLineNumbers: showLineNumbers,
+                wrapLines: wrapLines,
+                highlightSelectedLine: highlightSelectedLine,
+                syntaxHighlighting: syntaxHighlighting,
+                colorScheme: colorScheme
+            )
                 .frame(minWidth: 320, idealWidth: 700, maxWidth: .infinity, maxHeight: .infinity)
 
             ResultPane(result: result, isRunning: isRunning, contentScale: contentScale)
@@ -293,9 +320,23 @@ private struct ReplWorkspace: View {
 private struct EditorPane: View {
     @Binding var code: String
     let contentScale: CGFloat
+    let showLineNumbers: Bool
+    let wrapLines: Bool
+    let highlightSelectedLine: Bool
+    let syntaxHighlighting: Bool
+    let colorScheme: EditorColorScheme
 
     var body: some View {
-        AppKitCodeEditor(text: $code, fontSize: 14 * contentScale)
+        AppKitCodeEditor(
+            text: $code,
+            fontSize: 14 * contentScale,
+            showLineNumbers: showLineNumbers,
+            wrapLines: wrapLines,
+            highlightSelectedLine: highlightSelectedLine,
+            syntaxHighlighting: syntaxHighlighting,
+            colorScheme: colorScheme
+        )
+            .id("editor-\(showLineNumbers)-\(wrapLines)-\(highlightSelectedLine)-\(syntaxHighlighting)-\(colorScheme.rawValue)")
             .padding(12)
             .background(Color(nsColor: .textBackgroundColor))
     }
@@ -396,6 +437,11 @@ private enum ResultFormatter {
 private struct AppKitCodeEditor: NSViewRepresentable {
     @Binding var text: String
     let fontSize: CGFloat
+    let showLineNumbers: Bool
+    let wrapLines: Bool
+    let highlightSelectedLine: Bool
+    let syntaxHighlighting: Bool
+    let colorScheme: EditorColorScheme
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text)
@@ -408,16 +454,16 @@ private struct AppKitCodeEditor: NSViewRepresentable {
         textView.textDelegate = context.coordinator
         textView.textColor = .textColor
         textView.backgroundColor = .textBackgroundColor
-        textView.highlightSelectedLine = true
-        textView.showsLineNumbers = true
-        textView.isHorizontallyResizable = false
+        textView.highlightSelectedLine = highlightSelectedLine
+        textView.showsLineNumbers = showLineNumbers
+        textView.isHorizontallyResizable = !wrapLines
         textView.text = text
 
         textView.gutterView?.textColor = .secondaryLabelColor
         textView.gutterView?.drawSeparator = true
 
         context.coordinator.applyEditorFont(fontSize, to: textView, force: true)
-        context.coordinator.installPlugins(on: textView)
+        context.coordinator.installPlugins(on: textView, syntaxHighlighting: syntaxHighlighting, colorScheme: colorScheme)
         return scrollView
     }
 
@@ -432,6 +478,9 @@ private struct AppKitCodeEditor: NSViewRepresentable {
             context.coordinator.isSyncing = false
         }
 
+        textView.highlightSelectedLine = highlightSelectedLine
+        textView.showsLineNumbers = showLineNumbers
+        textView.isHorizontallyResizable = !wrapLines
         context.coordinator.applyEditorFont(fontSize, to: textView)
         textView.backgroundColor = .textBackgroundColor
         textView.textColor = .textColor
@@ -449,14 +498,64 @@ private struct AppKitCodeEditor: NSViewRepresentable {
             self._text = text
         }
 
-        func installPlugins(on textView: STTextView) {
-            guard !didInstallPlugin else { return }
-            let colorOnlyTheme = Theme(
-                colors: Theme.default.colors,
-                fonts: Theme.Fonts(fonts: [:])
-            )
+        func installPlugins(on textView: STTextView, syntaxHighlighting: Bool, colorScheme: EditorColorScheme) {
+            guard syntaxHighlighting, !didInstallPlugin else { return }
+            let colorOnlyTheme = makeColorOnlyTheme(colorScheme)
             textView.addPlugin(NeonPlugin(theme: colorOnlyTheme, language: .php))
             didInstallPlugin = true
+        }
+
+        private func makeColorOnlyTheme(_ scheme: EditorColorScheme) -> Theme {
+            switch scheme {
+            case .default:
+                return Theme(colors: Theme.default.colors, fonts: Theme.Fonts(fonts: [:]))
+            case .ocean:
+                return Theme(colors: Theme.Colors(colors: [
+                    "plain": NSColor(hex: "#DDEAF7"),
+                    "boolean": NSColor(hex: "#78DCE8"),
+                    "comment": NSColor(hex: "#6B8BAA"),
+                    "constructor": NSColor(hex: "#A6E22E"),
+                    "function.call": NSColor(hex: "#A6E22E"),
+                    "include": NSColor(hex: "#F78C6C"),
+                    "keyword": NSColor(hex: "#C792EA"),
+                    "keyword.function": NSColor(hex: "#C792EA"),
+                    "keyword.return": NSColor(hex: "#C792EA"),
+                    "method": NSColor(hex: "#82AAFF"),
+                    "number": NSColor(hex: "#F78C6C"),
+                    "operator": NSColor(hex: "#89DDFF"),
+                    "parameter": NSColor(hex: "#FFCB6B"),
+                    "punctuation.special": NSColor(hex: "#89DDFF"),
+                    "string": NSColor(hex: "#C3E88D"),
+                    "text.literal": NSColor(hex: "#C3E88D"),
+                    "text.title": NSColor(hex: "#82AAFF"),
+                    "type": NSColor(hex: "#FFCB6B"),
+                    "variable.builtin": NSColor(hex: "#FF5370"),
+                    "variable": NSColor(hex: "#DDEAF7")
+                ]), fonts: Theme.Fonts(fonts: [:]))
+            case .solarized:
+                return Theme(colors: Theme.Colors(colors: [
+                    "plain": NSColor(hex: "#839496"),
+                    "boolean": NSColor(hex: "#2AA198"),
+                    "comment": NSColor(hex: "#586E75"),
+                    "constructor": NSColor(hex: "#B58900"),
+                    "function.call": NSColor(hex: "#268BD2"),
+                    "include": NSColor(hex: "#CB4B16"),
+                    "keyword": NSColor(hex: "#859900"),
+                    "keyword.function": NSColor(hex: "#859900"),
+                    "keyword.return": NSColor(hex: "#859900"),
+                    "method": NSColor(hex: "#268BD2"),
+                    "number": NSColor(hex: "#D33682"),
+                    "operator": NSColor(hex: "#6C71C4"),
+                    "parameter": NSColor(hex: "#B58900"),
+                    "punctuation.special": NSColor(hex: "#6C71C4"),
+                    "string": NSColor(hex: "#2AA198"),
+                    "text.literal": NSColor(hex: "#2AA198"),
+                    "text.title": NSColor(hex: "#268BD2"),
+                    "type": NSColor(hex: "#B58900"),
+                    "variable.builtin": NSColor(hex: "#CB4B16"),
+                    "variable": NSColor(hex: "#839496")
+                ]), fonts: Theme.Fonts(fonts: [:]))
+            }
         }
 
         func applyEditorFont(_ size: CGFloat, to textView: STTextView, force: Bool = false) {
@@ -486,4 +585,17 @@ private struct AppKitCodeEditor: NSViewRepresentable {
 
 #Preview {
     ContentView()
+}
+
+private extension NSColor {
+    convenience init(hex: String) {
+        let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var value: UInt64 = 0
+        Scanner(string: cleaned).scanHexInt64(&value)
+
+        let r = CGFloat((value >> 16) & 0xFF) / 255.0
+        let g = CGFloat((value >> 8) & 0xFF) / 255.0
+        let b = CGFloat(value & 0xFF) / 255.0
+        self.init(red: r, green: g, blue: b, alpha: 1.0)
+    }
 }
