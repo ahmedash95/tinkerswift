@@ -1,0 +1,33 @@
+name: TinkerSwift
+options:
+  minimumXcodeGenVersion: 2.38.0
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    PRODUCT_BUNDLE_IDENTIFIER: com.ahmed.tinkerswift
+    GENERATE_INFOPLIST_FILE: YES
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.0
+    DEVELOPMENT_TEAM: ""
+packages:
+  STTextView:
+    url: https://github.com/krzyzanowskim/STTextView
+    branch: main
+  STTextViewPluginNeon:
+    path: Vendor/STTextView-Plugin-Neon
+targets:
+  TinkerSwift:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: TinkerSwift
+    dependencies:
+      - package: STTextView
+        product: STTextView
+      - package: STTextViewPluginNeon
+        product: STTextView-Plugin-Neon
+    settings:
+      base:
+        PRODUCT_NAME: TinkerSwift
+        CODE_SIGN_STYLE: Automatic
