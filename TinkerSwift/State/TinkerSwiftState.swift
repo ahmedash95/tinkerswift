@@ -267,6 +267,7 @@ final class AppModel {
         static let laravelProjectPath = "laravel.projectPath"
         static let laravelProjectsJSON = "laravel.projectsJSON"
         static let runHistoryJSON = "laravel.runHistoryJSON"
+        static let projectDraftsJSON = "editor.projectDraftsJSON"
     }
 
     private static let minScale = 0.6
@@ -311,6 +312,10 @@ final class AppModel {
         didSet { persistRunHistory(runHistory) }
     }
 
+    var projectDraftsByPath: [String: String] {
+        didSet { persistProjectDrafts(projectDraftsByPath) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -333,6 +338,9 @@ final class AppModel {
 
         let savedRunHistoryJSON = defaults.string(forKey: DefaultsKey.runHistoryJSON) ?? "[]"
         runHistory = Self.decodeRunHistory(from: savedRunHistoryJSON)
+
+        let savedProjectDraftsJSON = defaults.string(forKey: DefaultsKey.projectDraftsJSON) ?? "{}"
+        projectDraftsByPath = Self.decodeProjectDrafts(from: savedProjectDraftsJSON)
     }
 
     var scale: CGFloat {
@@ -388,6 +396,18 @@ final class AppModel {
             .sorted { $0.executedAt > $1.executedAt }
     }
 
+    func editorDraft(for projectPath: String) -> String? {
+        let normalizedPath = Self.normalizeProjectPath(projectPath)
+        guard !normalizedPath.isEmpty else { return nil }
+        return projectDraftsByPath[normalizedPath]
+    }
+
+    func setEditorDraft(_ code: String, for projectPath: String) {
+        let normalizedPath = Self.normalizeProjectPath(projectPath)
+        guard !normalizedPath.isEmpty else { return }
+        projectDraftsByPath[normalizedPath] = code
+    }
+
     private func persistProjects(_ projects: [LaravelProject]) {
         let encoder = JSONEncoder()
         guard let data = try? encoder.encode(projects),
@@ -407,6 +427,16 @@ final class AppModel {
         }
 
         defaults.set(json, forKey: DefaultsKey.runHistoryJSON)
+    }
+
+    private func persistProjectDrafts(_ draftsByPath: [String: String]) {
+        let encoder = JSONEncoder()
+        guard let data = try? encoder.encode(draftsByPath),
+              let json = String(data: data, encoding: .utf8) else {
+            return
+        }
+
+        defaults.set(json, forKey: DefaultsKey.projectDraftsJSON)
     }
 
     private static func decodeProjects(from json: String) -> [LaravelProject] {
@@ -442,6 +472,21 @@ final class AppModel {
                 executedAt: item.executedAt
             )
         }
+    }
+
+    private static func decodeProjectDrafts(from json: String) -> [String: String] {
+        guard let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return [:]
+        }
+
+        var sanitized: [String: String] = [:]
+        for (path, draft) in decoded {
+            let normalizedPath = normalizeProjectPath(path)
+            guard !normalizedPath.isEmpty else { continue }
+            sanitized[normalizedPath] = draft
+        }
+        return sanitized
     }
 
     private static func normalizeProjectPath(_ raw: String) -> String {
@@ -510,10 +555,16 @@ return $users->toJson();
     var defaultProjectInstallOutput = ""
     var defaultProjectInstallErrorMessage = ""
     private var pendingRestartAfterStop = false
+    private var isRestoringProjectDraft = false
     var lastRunMetrics: RunMetrics?
     var resultViewMode: ResultViewMode = .pretty
     var rawStreamMode: RawStreamMode = .output
-    var code = defaultCode
+    var code = defaultCode {
+        didSet {
+            guard !isRestoringProjectDraft else { return }
+            appModel.setEditorDraft(code, for: laravelProjectPath)
+        }
+    }
     var resultMessage = "Press Run to execute code."
     var latestExecution: PHPExecutionResult?
     var selectedRunHistoryItemID: String?
@@ -521,8 +572,10 @@ return $users->toJson();
         didSet {
             appModel.setLastSelectedProjectPath(laravelProjectPath)
             if laravelProjectPath != oldValue {
+                appModel.setEditorDraft(code, for: oldValue)
                 evaluateDefaultProjectSelection(showPromptIfMissing: true)
                 selectedRunHistoryItemID = nil
+                loadCodeDraftForCurrentProject()
             }
             updateRunHistoryWindowTitle()
         }
@@ -537,6 +590,7 @@ return $users->toJson();
         } else {
             laravelProjectPath = savedPath
         }
+        loadCodeDraftForCurrentProject()
         evaluateDefaultProjectSelection(showPromptIfMissing: laravelProjectPath == defaultProject.path)
     }
 
@@ -885,6 +939,13 @@ return $users->toJson();
 
     private func updateRunHistoryWindowTitle() {
         historyWindowController?.window?.title = runHistoryWindowTitle
+    }
+
+    private func loadCodeDraftForCurrentProject() {
+        let draft = appModel.editorDraft(for: laravelProjectPath) ?? Self.defaultCode
+        isRestoringProjectDraft = true
+        code = draft
+        isRestoringProjectDraft = false
     }
 
     private func closeRunHistoryWindow() {
