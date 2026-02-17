@@ -316,7 +316,7 @@ return $users->toJson();
     private let defaultProjectInstaller = LaravelProjectInstaller()
     private let defaultProject = LaravelProject(path: WorkspaceState.defaultProjectPath)
 
-    var columnVisibility: NavigationSplitViewVisibility = .all
+    var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
     var isPickingProjectFolder = false
     var isRunning = false
     var isShowingDefaultProjectInstallSheet = false
