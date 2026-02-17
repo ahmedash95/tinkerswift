@@ -15,13 +15,29 @@ struct AppKitCodeEditor: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = CodePaneTextView.scrollableTextView()
-        let textView = scrollView.documentView as! CodePaneTextView
+        let scrollView = EditorHostScrollView(frame: .zero)
+        let textView = CodePaneTextView(frame: .zero)
+
+        scrollView.wantsLayer = true
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.drawsBackground = false
+        scrollView.backgroundColor = .clear
+        scrollView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        scrollView.setContentHuggingPriority(.defaultLow, for: .vertical)
+        scrollView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        scrollView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        scrollView.documentView = textView
 
         context.coordinator.attachEditorTextView(textView)
         textView.textDelegate = context.coordinator
         textView.textColor = .textColor
-        textView.backgroundColor = .textBackgroundColor
+        textView.backgroundColor = .clear
+        textView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        textView.setContentHuggingPriority(.defaultLow, for: .vertical)
+        textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        textView.isVerticallyResizable = true
         textView.highlightSelectedLine = highlightSelectedLine
         textView.showsLineNumbers = showLineNumbers
         textView.isHorizontallyResizable = !wrapLines
@@ -34,6 +50,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         context.coordinator.installPluginsIfNeeded(on: textView)
         context.coordinator.updateSyntaxHighlighting(syntaxHighlighting, on: textView, force: true)
         context.coordinator.updateVisualState(on: textView, force: true)
+        scrollView.stretchDocumentViewToViewportIfNeeded()
         return scrollView
     }
 
@@ -42,6 +59,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
             return
         }
 
+        scrollView.backgroundColor = .clear
         context.coordinator.attachEditorTextView(textView)
 
         if (textView.text ?? "") != text {
@@ -56,6 +74,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         context.coordinator.applyEditorFont(fontSize, to: textView)
         context.coordinator.updateSyntaxHighlighting(syntaxHighlighting, on: textView)
         context.coordinator.updateVisualState(on: textView)
+        (scrollView as? EditorHostScrollView)?.stretchDocumentViewToViewportIfNeeded()
     }
 
     @MainActor
@@ -125,15 +144,12 @@ struct AppKitCodeEditor: NSViewRepresentable {
             lastVisualStateSignature = currentSignature
 
             textView.effectiveAppearance.performAsCurrentDrawingAppearance {
-                textView.backgroundColor = .textBackgroundColor
+                textView.backgroundColor = .clear
                 textView.textColor = .textColor
                 textView.insertionPointColor = .textColor
                 textView.gutterView?.textColor = .secondaryLabelColor
                 textView.gutterView?.drawSeparator = true
             }
-            textView.needsLayout = true
-            textView.needsDisplay = true
-            textView.gutterView?.needsDisplay = true
 
             neonPlugin?.refreshHighlightingForAppearanceChange()
         }
@@ -148,9 +164,49 @@ struct AppKitCodeEditor: NSViewRepresentable {
     }
 }
 
+fileprivate final class EditorHostScrollView: NSScrollView {
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+    }
+
+    override var fittingSize: NSSize {
+        NSSize(width: 1, height: 1)
+    }
+
+    override func layout() {
+        super.layout()
+        stretchDocumentViewToViewportIfNeeded()
+    }
+
+    func stretchDocumentViewToViewportIfNeeded() {
+        guard let documentView else { return }
+
+        let viewportSize = contentView.bounds.size
+        var frame = documentView.frame
+        var needsUpdate = false
+
+        if frame.width < viewportSize.width {
+            frame.size.width = viewportSize.width
+            needsUpdate = true
+        }
+        if frame.height < viewportSize.height {
+            frame.size.height = viewportSize.height
+            needsUpdate = true
+        }
+
+        if needsUpdate {
+            documentView.frame = frame
+        }
+    }
+}
+
 fileprivate final class CodePaneTextView: STTextView {
     var onVisualStateChange: (() -> Void)?
     private weak var observedWindow: NSWindow?
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()

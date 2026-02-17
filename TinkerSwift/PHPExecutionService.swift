@@ -123,10 +123,20 @@ try {
         let process = Process()
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
+        let startedAt = Date()
 
         process.currentDirectoryURL = projectURL
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["php", runnerFileName]
+        process.arguments = [
+            "php",
+            "-d",
+            "display_errors=1",
+            "-d",
+            "html_errors=0",
+            "-d",
+            "error_reporting=E_ALL",
+            runnerFileName
+        ]
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
@@ -134,8 +144,8 @@ try {
 
         do {
             beginActiveExecution(process: process, runID: runID)
-            try process.run()
-            process.waitUntilExit()
+            try await runAndWaitForTermination(process)
+            process.terminationHandler = nil
 
             let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
             let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
@@ -145,6 +155,7 @@ try {
             let stoppedByRequest = endActiveExecution(runID)
             let stoppedBySignal = process.terminationReason == .uncaughtSignal &&
                 (process.terminationStatus == SIGTERM || process.terminationStatus == SIGINT)
+            let durationMs = runtimeMetrics?.durationMs ?? Date().timeIntervalSince(startedAt) * 1000.0
             cleanupTemporaryFiles()
 
             return PHPExecutionResult(
@@ -152,7 +163,7 @@ try {
                 stdout: stdout,
                 stderr: stderr,
                 exitCode: process.terminationStatus,
-                durationMs: runtimeMetrics?.durationMs,
+                durationMs: durationMs,
                 peakMemoryBytes: runtimeMetrics?.peakMemoryBytes,
                 wasStopped: stoppedByRequest || stoppedBySignal
             )
@@ -177,10 +188,16 @@ try {
         }
 
         guard let processToStop = activeProcess, processToStop.isRunning else { return }
+        let pid = processToStop.processIdentifier
         processToStop.interrupt()
         DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.2) {
             if processToStop.isRunning {
                 processToStop.terminate()
+                DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.3) {
+                    if processToStop.isRunning {
+                        kill(pid_t(pid), SIGKILL)
+                    }
+                }
             }
         }
     }
@@ -209,6 +226,20 @@ try {
     private func beginActiveExecution(process: Process, runID: UUID) {
         activeProcess = process
         activeRunID = runID
+    }
+
+    private func runAndWaitForTermination(_ process: Process) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            process.terminationHandler = { _ in
+                continuation.resume()
+            }
+            do {
+                try process.run()
+            } catch {
+                process.terminationHandler = nil
+                continuation.resume(throwing: error)
+            }
+        }
     }
 
     @discardableResult

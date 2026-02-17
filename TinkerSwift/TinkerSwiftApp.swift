@@ -29,7 +29,7 @@ private struct TinkerSwiftCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Run") {
-            Button((isRunningScript ?? false) ? "Stop Script" : "Run Code") {
+            Button((isRunningScript ?? false) ? "Restart Code" : "Run Code") {
                 runCodeAction?()
             }
             .keyboardShortcut("r", modifiers: [.command])
@@ -77,27 +77,6 @@ struct WorkspaceRootView: View {
         ContentView()
             .environment(appModel)
             .environment(workspaceState)
-            .background(WindowTabbingConfigurator())
-    }
-}
-
-private struct WindowTabbingConfigurator: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        DispatchQueue.main.async {
-            guard let window = view.window else { return }
-            window.tabbingMode = .preferred
-        }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            guard let window = nsView.window else { return }
-            if window.tabbingMode != .preferred {
-                window.tabbingMode = .preferred
-            }
-        }
     }
 }
 

@@ -1,6 +1,31 @@
+import AppKit
 import Foundation
 import Observation
 import SwiftUI
+
+enum ResultViewMode: String, CaseIterable {
+    case pretty
+    case raw
+}
+
+enum RawStreamMode: String, CaseIterable {
+    case output
+    case error
+    case combined
+
+    static func resolved(_ requested: RawStreamMode, hasStdout: Bool, hasStderr: Bool) -> RawStreamMode {
+        if requested == .output && !hasStdout {
+            return hasStderr ? .error : .combined
+        }
+        if requested == .error && !hasStderr {
+            return hasStdout ? .output : .combined
+        }
+        if requested == .combined && !(hasStdout && hasStderr) {
+            return hasStdout ? .output : .error
+        }
+        return requested
+    }
+}
 
 struct LaravelProject: Codable, Hashable, Identifiable {
     let path: String
@@ -10,8 +35,8 @@ struct LaravelProject: Codable, Hashable, Identifiable {
 }
 
 struct RunMetrics {
-    let durationMs: Double
-    let peakMemoryBytes: UInt64
+    let durationMs: Double?
+    let peakMemoryBytes: UInt64?
 }
 
 @MainActor
@@ -27,10 +52,21 @@ final class AppModel {
         static let laravelProjectsJSON = "laravel.projectsJSON"
     }
 
+    private static let minScale = 0.6
+    private static let maxScale = 3.0
+    private static let defaultScale = 1.0
+
     private let defaults: UserDefaults
 
     var appUIScale: Double {
-        didSet { defaults.set(appUIScale, forKey: DefaultsKey.appUIScale) }
+        didSet {
+            let normalized = Self.sanitizedScale(appUIScale)
+            if appUIScale != normalized {
+                appUIScale = normalized
+                return
+            }
+            defaults.set(normalized, forKey: DefaultsKey.appUIScale)
+        }
     }
 
     var showLineNumbers: Bool {
@@ -56,7 +92,7 @@ final class AppModel {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
-        appUIScale = defaults.object(forKey: DefaultsKey.appUIScale) as? Double ?? 1.0
+        appUIScale = Self.sanitizedScale(defaults.object(forKey: DefaultsKey.appUIScale) as? Double ?? Self.defaultScale)
         showLineNumbers = defaults.object(forKey: DefaultsKey.showLineNumbers) as? Bool ?? true
         wrapLines = defaults.object(forKey: DefaultsKey.wrapLines) as? Bool ?? true
         highlightSelectedLine = defaults.object(forKey: DefaultsKey.highlightSelectedLine) as? Bool ?? true
@@ -75,7 +111,7 @@ final class AppModel {
     }
 
     var scale: CGFloat {
-        CGFloat(max(0.6, min(appUIScale, 3.0)))
+        CGFloat(Self.sanitizedScale(appUIScale))
     }
 
     var lastSelectedProjectPath: String {
@@ -128,6 +164,13 @@ final class AppModel {
         }
         return normalized
     }
+
+    private static func sanitizedScale(_ value: Double) -> Double {
+        guard value.isFinite else {
+            return defaultScale
+        }
+        return min(max(value, minScale), maxScale)
+    }
 }
 
 @MainActor
@@ -156,12 +199,16 @@ return $users->toJson();
     let appModel: AppModel
     private let runner = PHPExecutionRunner()
 
-    var columnVisibility: NavigationSplitViewVisibility = .detailOnly
+    var columnVisibility: NavigationSplitViewVisibility = .all
     var isPickingProjectFolder = false
     var isRunning = false
+    private var pendingRestartAfterStop = false
     var lastRunMetrics: RunMetrics?
+    var resultViewMode: ResultViewMode = .pretty
+    var rawStreamMode: RawStreamMode = .output
     var code = defaultCode
-    var result = "Press Run to execute code."
+    var resultMessage = "Press Run to execute code."
+    var latestExecution: PHPExecutionResult?
     var laravelProjectPath: String {
         didSet { appModel.setLastSelectedProjectPath(laravelProjectPath) }
     }
@@ -214,29 +261,122 @@ return $users->toJson();
         return URL(fileURLWithPath: laravelProjectPath).lastPathComponent
     }
 
-    var executionTimeText: String {
-        if isRunning {
-            return "Running"
+    var resultPresentation: ExecutionPresentation {
+        ExecutionResultPresenter.present(
+            execution: latestExecution,
+            statusMessage: resultMessage,
+            isRunning: isRunning,
+            fontSize: 14 * scale
+        )
+    }
+
+    var resultStatusIconName: String {
+        switch resultPresentation.status {
+        case .idle:
+            return "circle"
+        case .running:
+            return "hourglass"
+        case .success:
+            return "checkmark.circle.fill"
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        case .exception:
+            return "exclamationmark.octagon.fill"
+        case .fatal:
+            return "xmark.octagon.fill"
+        case .error:
+            return "xmark.circle.fill"
+        case .stopped:
+            return "stop.circle.fill"
+        case .empty:
+            return "minus.circle"
         }
-        guard let metrics = lastRunMetrics else {
+    }
+
+    var resultStatusColor: Color {
+        switch resultPresentation.status {
+        case .idle, .running, .stopped, .empty:
+            return .secondary
+        case .success:
+            return .green
+        case .warning:
+            return .orange
+        case .exception, .fatal, .error:
+            return .red
+        }
+    }
+
+    var effectiveRawStreamMode: RawStreamMode {
+        RawStreamMode.resolved(
+            rawStreamMode,
+            hasStdout: resultPresentation.hasStdout,
+            hasStderr: resultPresentation.hasStderr
+        )
+    }
+
+    var rawResultText: String {
+        switch effectiveRawStreamMode {
+        case .output:
+            return resultPresentation.rawStdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .error:
+            return resultPresentation.rawStderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .combined:
+            let stdout = resultPresentation.rawStdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            let stderr = resultPresentation.rawStderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            if stdout.isEmpty { return stderr }
+            if stderr.isEmpty { return stdout }
+            return "[STDOUT]\n\(stdout)\n\n[STDERR]\n\(stderr)"
+        }
+    }
+
+    var canChooseResultStream: Bool {
+        resultViewMode == .raw && (resultPresentation.hasStdout || resultPresentation.hasStderr)
+    }
+
+    var copyableResultText: String {
+        if resultViewMode == .raw {
+            return rawResultText
+        }
+
+        return resultPresentation.prettySections
+            .map { section in
+                let text = String(section.content.characters)
+                return "\(section.title)\n\(text)"
+            }
+            .joined(separator: "\n\n")
+    }
+
+    var canCopyResultOutput: Bool {
+        !copyableResultText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var executionTimeText: String {
+        guard let durationMs = lastRunMetrics?.durationMs else {
             return "--"
         }
-        return formatDuration(metrics.durationMs)
+        return formatDuration(durationMs)
     }
 
     var memoryUsageText: String {
-        if isRunning {
+        guard let peakMemoryBytes = lastRunMetrics?.peakMemoryBytes else {
             return "--"
         }
-        guard let metrics = lastRunMetrics else {
-            return "--"
-        }
-        return Self.memoryFormatter.string(fromByteCount: Int64(metrics.peakMemoryBytes))
+        return Self.memoryFormatter.string(fromByteCount: Int64(peakMemoryBytes))
     }
 
     func toggleRunStop() {
         if isRunning {
+            pendingRestartAfterStop = false
             stopRunningScript()
+        } else {
+            runCode()
+        }
+    }
+
+    func runOrRestartFromShortcut() {
+        if isRunning {
+            pendingRestartAfterStop = true
+            stopRunningScript(statusMessage: "Restarting script...")
         } else {
             runCode()
         }
@@ -257,48 +397,61 @@ return $users->toJson();
         }
     }
 
+    func copyVisibleResultToPasteboard() {
+        guard canCopyResultOutput else { return }
+        #if os(macOS)
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(copyableResultText, forType: .string)
+        #endif
+    }
+
     private func executeRunCode() async {
         guard !laravelProjectPath.isEmpty else {
-            result = "Select a Laravel project folder first (toolbar: plus.folder)."
+            latestExecution = nil
+            resultMessage = "Select a Laravel project folder first (toolbar: plus.folder)."
             return
         }
 
         isRunning = true
-        defer { isRunning = false }
+        defer {
+            isRunning = false
+            pendingRestartAfterStop = false
+        }
 
-        let execution = await runner.run(code: code, projectPath: laravelProjectPath)
-        let stdout = execution.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-        let stderr = execution.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        while true {
+            resultMessage = "Running script..."
 
-        if execution.wasStopped {
-            lastRunMetrics = nil
-            result = "Execution stopped."
+            let execution = await runner.run(code: code, projectPath: laravelProjectPath)
+            latestExecution = execution
+
+            if execution.wasStopped {
+                if pendingRestartAfterStop {
+                    pendingRestartAfterStop = false
+                    continue
+                }
+                lastRunMetrics = RunMetrics(
+                    durationMs: execution.durationMs,
+                    peakMemoryBytes: execution.peakMemoryBytes
+                )
+                resultMessage = "Execution stopped."
+                return
+            }
+
+            lastRunMetrics = RunMetrics(
+                durationMs: execution.durationMs,
+                peakMemoryBytes: execution.peakMemoryBytes
+            )
+            resultMessage = "Execution completed."
             return
-        }
-
-        if let durationMs = execution.durationMs,
-           let peakMemoryBytes = execution.peakMemoryBytes {
-            lastRunMetrics = RunMetrics(durationMs: durationMs, peakMemoryBytes: peakMemoryBytes)
-        } else {
-            lastRunMetrics = nil
-        }
-
-        if !stdout.isEmpty {
-            result = execution.stdout
-        } else if !stderr.isEmpty {
-            result = execution.stderr
-        } else if execution.exitCode != 0 {
-            result = "Process failed with exit code \(execution.exitCode)."
-        } else {
-            result = "(empty)"
         }
     }
 
-    private func stopRunningScript() {
+    private func stopRunningScript(statusMessage: String = "Stopping script...") {
         Task {
             await runner.stop()
         }
-        result = "Stopping script..."
+        resultMessage = statusMessage
     }
 
     private func formatDuration(_ durationMs: Double) -> String {

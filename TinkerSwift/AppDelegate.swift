@@ -21,6 +21,12 @@ final class TinkerSwiftAppDelegate: NSObject, NSApplicationDelegate {
             name: .tinkerSwiftNewTabRequested,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWindowDidBecomeMain(_:)),
+            name: NSWindow.didBecomeMainNotification,
+            object: nil
+        )
     }
 
     deinit {
@@ -51,6 +57,14 @@ final class TinkerSwiftAppDelegate: NSObject, NSApplicationDelegate {
         guard let closingWindow = notification.object as? NSWindow else { return }
         externalWindowControllers.removeAll { $0.window === closingWindow }
         NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: closingWindow)
+    }
+
+    @objc
+    private func handleWindowDidBecomeMain(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        if window.tabbingMode != .preferred {
+            window.tabbingMode = .preferred
+        }
     }
 
     private func trackExternalWindowController(_ controller: NSWindowController) {
