@@ -8,6 +8,112 @@ enum ResultViewMode: String, CaseIterable {
     case raw
 }
 
+private struct RunHistoryWindowView: View {
+    @Environment(WorkspaceState.self) private var workspaceState
+
+    var body: some View {
+        @Bindable var workspaceState = workspaceState
+
+        NavigationSplitView {
+            List(selection: $workspaceState.selectedRunHistoryItemID) {
+                if workspaceState.selectedProjectRunHistory.isEmpty {
+                    Text("No runs yet for this project")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(workspaceState.selectedProjectRunHistory) { item in
+                        RunHistoryRowView(item: item)
+                            .tag(item.id)
+                    }
+                }
+            }
+            .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 460)
+        } detail: {
+            if let selectedRunHistoryItem = workspaceState.selectedRunHistoryItem {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(Self.dateFormatter.string(from: selectedRunHistoryItem.executedAt))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    AppKitCodeEditor(
+                        text: previewCodeBinding(for: selectedRunHistoryItem),
+                        fontSize: 13 * workspaceState.scale,
+                        showLineNumbers: true,
+                        wrapLines: false,
+                        highlightSelectedLine: false,
+                        syntaxHighlighting: workspaceState.syntaxHighlighting,
+                        isEditable: false
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
+
+                    HStack {
+                        Spacer()
+                        Button("Use") {
+                            workspaceState.useSelectedRunHistoryItem()
+                        }
+                        .keyboardShortcut(.defaultAction)
+                    }
+                }
+                .padding(16)
+            } else {
+                ContentUnavailableView("No Run Selected", systemImage: "clock.arrow.circlepath")
+            }
+        }
+        .navigationTitle("Run History")
+        .navigationSubtitle(workspaceState.selectedProjectName)
+        .onAppear {
+            workspaceState.selectRunHistoryItemIfNeeded()
+        }
+        .onChange(of: workspaceState.laravelProjectPath) { _, _ in
+            workspaceState.selectRunHistoryItemIfNeeded()
+        }
+        .navigationSplitViewStyle(.balanced)
+    }
+
+    private func previewCodeBinding(for item: ProjectRunHistoryItem) -> Binding<String> {
+        Binding(
+            get: { item.code },
+            set: { _ in }
+        )
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .medium
+        return formatter
+    }()
+}
+
+private struct RunHistoryRowView: View {
+    let item: ProjectRunHistoryItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(Self.codePreview(for: item.code))
+                .lineLimit(1)
+                .font(.system(.body, design: .monospaced))
+            Text(Self.dateFormatter.string(from: item.executedAt))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private static func codePreview(for code: String) -> String {
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "(empty snippet)" }
+        return trimmed.components(separatedBy: .newlines).first ?? "(empty snippet)"
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter
+    }()
+}
+
 enum RawStreamMode: String, CaseIterable {
     case output
     case error
@@ -37,6 +143,13 @@ struct LaravelProject: Codable, Hashable, Identifiable {
 struct RunMetrics {
     let durationMs: Double?
     let peakMemoryBytes: UInt64?
+}
+
+struct ProjectRunHistoryItem: Codable, Hashable, Identifiable {
+    let id: String
+    let projectPath: String
+    let code: String
+    let executedAt: Date
 }
 
 struct LaravelProjectInstallResult {
@@ -153,11 +266,13 @@ final class AppModel {
         static let syntaxHighlighting = "editor.syntaxHighlighting"
         static let laravelProjectPath = "laravel.projectPath"
         static let laravelProjectsJSON = "laravel.projectsJSON"
+        static let runHistoryJSON = "laravel.runHistoryJSON"
     }
 
     private static let minScale = 0.6
     private static let maxScale = 3.0
     private static let defaultScale = 1.0
+    private static let maxRunHistoryPerProject = 100
 
     private let defaults: UserDefaults
 
@@ -192,6 +307,10 @@ final class AppModel {
         didSet { persistProjects(projects) }
     }
 
+    var runHistory: [ProjectRunHistoryItem] {
+        didSet { persistRunHistory(runHistory) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -211,6 +330,9 @@ final class AppModel {
         }
 
         projects = initialProjects
+
+        let savedRunHistoryJSON = defaults.string(forKey: DefaultsKey.runHistoryJSON) ?? "[]"
+        runHistory = Self.decodeRunHistory(from: savedRunHistoryJSON)
     }
 
     var scale: CGFloat {
@@ -235,6 +357,37 @@ final class AppModel {
         }
     }
 
+    func recordRunHistory(projectPath: String, code: String, executedAt: Date = Date()) {
+        let normalizedPath = Self.normalizeProjectPath(projectPath)
+        guard !normalizedPath.isEmpty else { return }
+
+        let historyEntry = ProjectRunHistoryItem(
+            id: UUID().uuidString,
+            projectPath: normalizedPath,
+            code: code,
+            executedAt: executedAt
+        )
+
+        var currentProjectHistory = runHistory.filter { $0.projectPath == normalizedPath }
+        currentProjectHistory.insert(historyEntry, at: 0)
+
+        if currentProjectHistory.count > Self.maxRunHistoryPerProject {
+            currentProjectHistory = Array(currentProjectHistory.prefix(Self.maxRunHistoryPerProject))
+        }
+
+        let otherProjectsHistory = runHistory.filter { $0.projectPath != normalizedPath }
+        runHistory = otherProjectsHistory + currentProjectHistory
+    }
+
+    func runHistory(for projectPath: String) -> [ProjectRunHistoryItem] {
+        let normalizedPath = Self.normalizeProjectPath(projectPath)
+        guard !normalizedPath.isEmpty else { return [] }
+
+        return runHistory
+            .filter { $0.projectPath == normalizedPath }
+            .sorted { $0.executedAt > $1.executedAt }
+    }
+
     private func persistProjects(_ projects: [LaravelProject]) {
         let encoder = JSONEncoder()
         guard let data = try? encoder.encode(projects),
@@ -243,6 +396,17 @@ final class AppModel {
         }
 
         defaults.set(json, forKey: DefaultsKey.laravelProjectsJSON)
+    }
+
+    private func persistRunHistory(_ history: [ProjectRunHistoryItem]) {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(history),
+              let json = String(data: data, encoding: .utf8) else {
+            return
+        }
+
+        defaults.set(json, forKey: DefaultsKey.runHistoryJSON)
     }
 
     private static func decodeProjects(from json: String) -> [LaravelProject] {
@@ -257,6 +421,26 @@ final class AppModel {
             guard !normalizedPath.isEmpty else { return nil }
             guard seen.insert(normalizedPath).inserted else { return nil }
             return LaravelProject(path: normalizedPath)
+        }
+    }
+
+    private static func decodeRunHistory(from json: String) -> [ProjectRunHistoryItem] {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let data = json.data(using: .utf8),
+              let decoded = try? decoder.decode([ProjectRunHistoryItem].self, from: data) else {
+            return []
+        }
+
+        return decoded.compactMap { item in
+            let normalizedPath = normalizeProjectPath(item.projectPath)
+            guard !normalizedPath.isEmpty else { return nil }
+            return ProjectRunHistoryItem(
+                id: item.id,
+                projectPath: normalizedPath,
+                code: item.code,
+                executedAt: item.executedAt
+            )
         }
     }
 
@@ -315,6 +499,8 @@ return $users->toJson();
     private let runner = PHPExecutionRunner()
     private let defaultProjectInstaller = LaravelProjectInstaller()
     private let defaultProject = LaravelProject(path: WorkspaceState.defaultProjectPath)
+    private var historyWindowController: NSWindowController?
+    private var historyWindowCloseObserver: NSObjectProtocol?
 
     var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
     var isPickingProjectFolder = false
@@ -330,12 +516,15 @@ return $users->toJson();
     var code = defaultCode
     var resultMessage = "Press Run to execute code."
     var latestExecution: PHPExecutionResult?
+    var selectedRunHistoryItemID: String?
     var laravelProjectPath: String {
         didSet {
             appModel.setLastSelectedProjectPath(laravelProjectPath)
             if laravelProjectPath != oldValue {
                 evaluateDefaultProjectSelection(showPromptIfMissing: true)
+                selectedRunHistoryItemID = nil
             }
+            updateRunHistoryWindowTitle()
         }
     }
 
@@ -392,6 +581,15 @@ return $users->toJson();
             return project.name
         }
         return URL(fileURLWithPath: laravelProjectPath).lastPathComponent
+    }
+
+    var selectedProjectRunHistory: [ProjectRunHistoryItem] {
+        appModel.runHistory(for: laravelProjectPath)
+    }
+
+    var selectedRunHistoryItem: ProjectRunHistoryItem? {
+        guard let selectedRunHistoryItemID else { return nil }
+        return selectedProjectRunHistory.first(where: { $0.id == selectedRunHistoryItemID })
     }
 
     var resultPresentation: ExecutionPresentation {
@@ -503,6 +701,10 @@ return $users->toJson();
         return FileManager.default.fileExists(atPath: laravelProjectPath, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 
+    var canShowRunHistory: Bool {
+        !laravelProjectPath.isEmpty
+    }
+
     func toggleRunStop() {
         if isRunning {
             pendingRestartAfterStop = false
@@ -564,6 +766,63 @@ return $users->toJson();
         #endif
     }
 
+    func showRunHistoryWindow() {
+        guard canShowRunHistory else { return }
+        selectRunHistoryItemIfNeeded()
+
+        if let existingWindow = historyWindowController?.window {
+            existingWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let rootView = RunHistoryWindowView()
+            .environment(self)
+        let hostingController = NSHostingController(rootView: rootView)
+
+        let window = NSWindow(contentViewController: hostingController)
+        window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+        window.title = runHistoryWindowTitle
+        window.setContentSize(NSSize(width: 900, height: 560))
+        window.minSize = NSSize(width: 760, height: 420)
+        window.isReleasedWhenClosed = false
+
+        let controller = NSWindowController(window: window)
+        historyWindowController = controller
+
+        historyWindowCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.historyWindowController = nil
+                if let historyWindowCloseObserver = self.historyWindowCloseObserver {
+                    NotificationCenter.default.removeObserver(historyWindowCloseObserver)
+                    self.historyWindowCloseObserver = nil
+                }
+            }
+        }
+
+        controller.showWindow(nil)
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func selectRunHistoryItemIfNeeded() {
+        if selectedRunHistoryItem != nil {
+            return
+        }
+        selectedRunHistoryItemID = selectedProjectRunHistory.first?.id
+    }
+
+    func useSelectedRunHistoryItem() {
+        guard let selectedRunHistoryItem else { return }
+        code = selectedRunHistoryItem.code
+        closeRunHistoryWindow()
+    }
+
     private func executeRunCode() async {
         guard !laravelProjectPath.isEmpty else {
             latestExecution = nil
@@ -586,6 +845,7 @@ return $users->toJson();
 
         while true {
             resultMessage = "Running script..."
+            appModel.recordRunHistory(projectPath: laravelProjectPath, code: code)
 
             let execution = await runner.run(code: code, projectPath: laravelProjectPath)
             latestExecution = execution
@@ -617,6 +877,23 @@ return $users->toJson();
             await runner.stop()
         }
         resultMessage = statusMessage
+    }
+
+    private var runHistoryWindowTitle: String {
+        "Run History - \(selectedProjectName)"
+    }
+
+    private func updateRunHistoryWindowTitle() {
+        historyWindowController?.window?.title = runHistoryWindowTitle
+    }
+
+    private func closeRunHistoryWindow() {
+        historyWindowController?.close()
+        historyWindowController = nil
+        if let historyWindowCloseObserver {
+            NotificationCenter.default.removeObserver(historyWindowCloseObserver)
+            self.historyWindowCloseObserver = nil
+        }
     }
 
     private func performDefaultProjectInstallation() async {

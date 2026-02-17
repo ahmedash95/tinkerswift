@@ -111,6 +111,12 @@ struct ContentView: View {
                 .help("Copy Visible Output")
                 .disabled(!workspaceState.canCopyResultOutput)
 
+                Button(action: workspaceState.showRunHistoryWindow) {
+                    Image(systemName: "clock.arrow.circlepath")
+                }
+                .help("Run History")
+                .disabled(!workspaceState.canShowRunHistory)
+
                 Button(action: workspaceState.revealSelectedProjectInFinder) {
                     Image(systemName: "folder.badge.gearshape")
                 }

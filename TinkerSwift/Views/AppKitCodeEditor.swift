@@ -9,6 +9,25 @@ struct AppKitCodeEditor: NSViewRepresentable {
     let wrapLines: Bool
     let highlightSelectedLine: Bool
     let syntaxHighlighting: Bool
+    let isEditable: Bool
+
+    init(
+        text: Binding<String>,
+        fontSize: CGFloat,
+        showLineNumbers: Bool,
+        wrapLines: Bool,
+        highlightSelectedLine: Bool,
+        syntaxHighlighting: Bool,
+        isEditable: Bool = true
+    ) {
+        _text = text
+        self.fontSize = fontSize
+        self.showLineNumbers = showLineNumbers
+        self.wrapLines = wrapLines
+        self.highlightSelectedLine = highlightSelectedLine
+        self.syntaxHighlighting = syntaxHighlighting
+        self.isEditable = isEditable
+    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text)
@@ -38,6 +57,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
         textView.isVerticallyResizable = true
+        textView.isEditable = isEditable
         textView.highlightSelectedLine = highlightSelectedLine
         textView.showsLineNumbers = showLineNumbers
         textView.isHorizontallyResizable = !wrapLines
@@ -69,6 +89,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         }
 
         textView.highlightSelectedLine = highlightSelectedLine
+        textView.isEditable = isEditable
         textView.showsLineNumbers = showLineNumbers
         textView.isHorizontallyResizable = !wrapLines
         context.coordinator.applyEditorFont(fontSize, to: textView)
