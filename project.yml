@@ -29,5 +29,6 @@ targets:
         product: STTextView-Plugin-Neon
     settings:
       base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: TinkerSwift/AppIcon.icon
         PRODUCT_NAME: TinkerSwift
         CODE_SIGN_STYLE: Automatic

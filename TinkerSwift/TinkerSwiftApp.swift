@@ -86,7 +86,7 @@ struct TinkerSwiftApp: App {
     @State private var appModel = AppModel()
 
     init() {
-        NSWindow.allowsAutomaticWindowTabbing = true
+        NSWindow.allowsAutomaticWindowTabbing = false
     }
 
     var body: some Scene {

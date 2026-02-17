@@ -497,6 +497,12 @@ return $users->toJson();
         return Self.memoryFormatter.string(fromByteCount: Int64(peakMemoryBytes))
     }
 
+    var canRevealSelectedProjectInFinder: Bool {
+        guard !laravelProjectPath.isEmpty else { return false }
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: laravelProjectPath, isDirectory: &isDirectory) && isDirectory.boolValue
+    }
+
     func toggleRunStop() {
         if isRunning {
             pendingRestartAfterStop = false
@@ -548,6 +554,13 @@ return $users->toJson();
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(copyableResultText, forType: .string)
+        #endif
+    }
+
+    func revealSelectedProjectInFinder() {
+        guard canRevealSelectedProjectInFinder else { return }
+        #if os(macOS)
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: laravelProjectPath)])
         #endif
     }
 

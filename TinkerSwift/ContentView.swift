@@ -110,6 +110,12 @@ struct ContentView: View {
                 }
                 .help("Copy Visible Output")
                 .disabled(!workspaceState.canCopyResultOutput)
+
+                Button(action: workspaceState.revealSelectedProjectInFinder) {
+                    Image(systemName: "folder.badge.gearshape")
+                }
+                .help("Reveal in Finder")
+                .disabled(!workspaceState.canRevealSelectedProjectInFinder)
             }
         }
         .navigationTitle(workspaceState.selectedProjectName)
