@@ -39,6 +39,109 @@ struct RunMetrics {
     let peakMemoryBytes: UInt64?
 }
 
+struct LaravelProjectInstallResult {
+    let stdout: String
+    let stderr: String
+    let exitCode: Int32
+    let wasSuccessful: Bool
+
+    var combinedOutput: String {
+        [stdout, stderr]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+    }
+}
+
+actor LaravelProjectInstaller {
+    func installDefaultProject(at projectPath: String) async -> LaravelProjectInstallResult {
+        let projectURL = URL(fileURLWithPath: projectPath)
+        let parentURL = projectURL.deletingLastPathComponent()
+
+        do {
+            try FileManager.default.createDirectory(at: parentURL, withIntermediateDirectories: true)
+        } catch {
+            return LaravelProjectInstallResult(
+                stdout: "",
+                stderr: "Failed to create cache directory: \(error.localizedDescription)",
+                exitCode: 1,
+                wasSuccessful: false
+            )
+        }
+
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+
+        process.currentDirectoryURL = parentURL
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = [
+            "laravel",
+            "new",
+            projectURL.lastPathComponent,
+            "--database=sqlite",
+            "--no-authentication",
+            "--no-interaction",
+            "--force"
+        ]
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        do {
+            try await runAndWaitForTermination(process)
+        } catch {
+            let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+            let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
+            let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+            let fallbackError = stderr.isEmpty ? "Failed to run `laravel new`: \(error.localizedDescription)" : stderr
+
+            return LaravelProjectInstallResult(
+                stdout: stdout,
+                stderr: fallbackError,
+                exitCode: 1,
+                wasSuccessful: false
+            )
+        }
+
+        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
+        var stderr = String(data: stderrData, encoding: .utf8) ?? ""
+        let artisanPath = projectURL.appendingPathComponent("artisan").path
+        let hasArtisan = FileManager.default.fileExists(atPath: artisanPath)
+        let wasSuccessful = process.terminationStatus == 0 && hasArtisan
+
+        if process.terminationStatus == 0 && !hasArtisan {
+            if !stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                stderr += "\n"
+            }
+            stderr += "Laravel command completed, but no artisan file was found at \(artisanPath)."
+        }
+
+        return LaravelProjectInstallResult(
+            stdout: stdout,
+            stderr: stderr,
+            exitCode: process.terminationStatus,
+            wasSuccessful: wasSuccessful
+        )
+    }
+
+    private func runAndWaitForTermination(_ process: Process) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            process.terminationHandler = { _ in
+                continuation.resume()
+            }
+            do {
+                try process.run()
+            } catch {
+                process.terminationHandler = nil
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -196,12 +299,30 @@ $users = User::query()
 return $users->toJson();
 """
 
+    private static let defaultProjectFolderName = "Default"
+
+    private static let defaultProjectPath: String = {
+        let cachesRoot = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.ahmed.tinkerswift"
+        return cachesRoot
+            .appendingPathComponent(bundleIdentifier, isDirectory: true)
+            .appendingPathComponent(defaultProjectFolderName, isDirectory: true)
+            .path
+    }()
+
     let appModel: AppModel
     private let runner = PHPExecutionRunner()
+    private let defaultProjectInstaller = LaravelProjectInstaller()
+    private let defaultProject = LaravelProject(path: WorkspaceState.defaultProjectPath)
 
     var columnVisibility: NavigationSplitViewVisibility = .all
     var isPickingProjectFolder = false
     var isRunning = false
+    var isShowingDefaultProjectInstallSheet = false
+    var isInstallingDefaultProject = false
+    var defaultProjectInstallOutput = ""
+    var defaultProjectInstallErrorMessage = ""
     private var pendingRestartAfterStop = false
     var lastRunMetrics: RunMetrics?
     var resultViewMode: ResultViewMode = .pretty
@@ -210,12 +331,24 @@ return $users->toJson();
     var resultMessage = "Press Run to execute code."
     var latestExecution: PHPExecutionResult?
     var laravelProjectPath: String {
-        didSet { appModel.setLastSelectedProjectPath(laravelProjectPath) }
+        didSet {
+            appModel.setLastSelectedProjectPath(laravelProjectPath)
+            if laravelProjectPath != oldValue {
+                evaluateDefaultProjectSelection(showPromptIfMissing: true)
+            }
+        }
     }
 
     init(appModel: AppModel) {
         self.appModel = appModel
-        laravelProjectPath = appModel.lastSelectedProjectPath.isEmpty ? (appModel.projects.first?.path ?? "") : appModel.lastSelectedProjectPath
+        let savedPath = appModel.lastSelectedProjectPath
+        if savedPath.isEmpty {
+            laravelProjectPath = defaultProject.path
+            appModel.setLastSelectedProjectPath(defaultProject.path)
+        } else {
+            laravelProjectPath = savedPath
+        }
+        evaluateDefaultProjectSelection(showPromptIfMissing: laravelProjectPath == defaultProject.path)
     }
 
     deinit {
@@ -250,12 +383,12 @@ return $users->toJson();
     }
 
     var projects: [LaravelProject] {
-        appModel.projects
+        [defaultProject] + appModel.projects.filter { $0.path != defaultProject.path }
     }
 
     var selectedProjectName: String {
         guard !laravelProjectPath.isEmpty else { return "No project selected" }
-        if let project = appModel.projects.first(where: { $0.path == laravelProjectPath }) {
+        if let project = projects.first(where: { $0.path == laravelProjectPath }) {
             return project.name
         }
         return URL(fileURLWithPath: laravelProjectPath).lastPathComponent
@@ -389,6 +522,18 @@ return $users->toJson();
         }
     }
 
+    func installDefaultProject() {
+        guard !isInstallingDefaultProject else { return }
+
+        isInstallingDefaultProject = true
+        defaultProjectInstallOutput = ""
+        defaultProjectInstallErrorMessage = ""
+
+        Task { [weak self] in
+            await self?.performDefaultProjectInstallation()
+        }
+    }
+
     func addProject(_ path: String) {
         appModel.addProject(path)
         let normalizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
@@ -410,6 +555,13 @@ return $users->toJson();
         guard !laravelProjectPath.isEmpty else {
             latestExecution = nil
             resultMessage = "Select a Laravel project folder first (toolbar: plus.folder)."
+            return
+        }
+
+        if laravelProjectPath == defaultProject.path && !isLaravelProjectAvailable(at: defaultProject.path) {
+            latestExecution = nil
+            resultMessage = "Install the Default Laravel project first."
+            isShowingDefaultProjectInstallSheet = true
             return
         }
 
@@ -452,6 +604,51 @@ return $users->toJson();
             await runner.stop()
         }
         resultMessage = statusMessage
+    }
+
+    private func performDefaultProjectInstallation() async {
+        let result = await defaultProjectInstaller.installDefaultProject(at: defaultProject.path)
+
+        defaultProjectInstallOutput = result.combinedOutput
+        isInstallingDefaultProject = false
+
+        if result.wasSuccessful {
+            defaultProjectInstallErrorMessage = ""
+            isShowingDefaultProjectInstallSheet = false
+            resultMessage = "Default Laravel project is ready."
+            return
+        }
+
+        let stderr = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        if stderr.isEmpty {
+            defaultProjectInstallErrorMessage = "Failed to install Default project (exit code \(result.exitCode))."
+        } else {
+            defaultProjectInstallErrorMessage = stderr
+        }
+        isShowingDefaultProjectInstallSheet = true
+    }
+
+    private func evaluateDefaultProjectSelection(showPromptIfMissing: Bool) {
+        guard laravelProjectPath == defaultProject.path else {
+            if !isInstallingDefaultProject {
+                isShowingDefaultProjectInstallSheet = false
+            }
+            return
+        }
+        guard !isLaravelProjectAvailable(at: defaultProject.path) else {
+            isShowingDefaultProjectInstallSheet = false
+            defaultProjectInstallErrorMessage = ""
+            return
+        }
+
+        if showPromptIfMissing {
+            isShowingDefaultProjectInstallSheet = true
+        }
+    }
+
+    private func isLaravelProjectAvailable(at path: String) -> Bool {
+        let artisanPath = URL(fileURLWithPath: path).appendingPathComponent("artisan").path
+        return FileManager.default.fileExists(atPath: artisanPath)
     }
 
     private func formatDuration(_ durationMs: Double) -> String {

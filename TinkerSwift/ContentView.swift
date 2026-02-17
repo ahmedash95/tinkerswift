@@ -122,6 +122,10 @@ struct ContentView: View {
             guard case let .success(urls) = result, let url = urls.first else { return }
             workspaceState.addProject(url.path)
         }
+        .sheet(isPresented: $workspaceState.isShowingDefaultProjectInstallSheet) {
+            DefaultProjectInstallSheet()
+                .environment(workspaceState)
+        }
         .focusedSceneValue(\.runCodeAction, workspaceState.runOrRestartFromShortcut)
         .focusedSceneValue(\.isRunningScript, workspaceState.isRunning)
     }
@@ -138,6 +142,84 @@ struct ContentView: View {
                 }
             }
         }
+    }
+}
+
+private struct DefaultProjectInstallSheet: View {
+    @Environment(WorkspaceState.self) private var workspaceState
+
+    var body: some View {
+        @Bindable var workspaceState = workspaceState
+
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Install Default Laravel Project")
+                .font(.title3.weight(.semibold))
+
+            Text("The built-in `Default` project has not been created yet. Install it now to run snippets immediately.")
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("Command:")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text("laravel new Default --database=sqlite --no-authentication --no-interaction --force")
+                .font(.system(.caption, design: .monospaced))
+                .textSelection(.enabled)
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+
+            if workspaceState.isInstallingDefaultProject {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Installing Default project...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !workspaceState.defaultProjectInstallErrorMessage.isEmpty {
+                Text(workspaceState.defaultProjectInstallErrorMessage)
+                    .font(.subheadline)
+                    .foregroundStyle(.red)
+            }
+
+            if !workspaceState.defaultProjectInstallOutput.isEmpty {
+                ScrollView {
+                    Text(workspaceState.defaultProjectInstallOutput)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+                .frame(minHeight: 100, maxHeight: 220)
+                .padding(8)
+                .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
+            }
+
+            HStack {
+                Spacer()
+
+                Button("Not Now") {
+                    workspaceState.isShowingDefaultProjectInstallSheet = false
+                }
+                .disabled(workspaceState.isInstallingDefaultProject)
+
+                Button {
+                    workspaceState.installDefaultProject()
+                } label: {
+                    if workspaceState.isInstallingDefaultProject {
+                        Text("Installing...")
+                    } else {
+                        Text("Install")
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(workspaceState.isInstallingDefaultProject)
+            }
+        }
+        .padding(18)
+        .frame(width: 620)
     }
 }
 

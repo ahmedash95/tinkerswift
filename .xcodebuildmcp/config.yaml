@@ -1,0 +1,6 @@
+schemaVersion: 1
+sessionDefaults:
+  projectPath: /Users/ahmed/Code/side-projects/tinkerswift/TinkerSwift.xcodeproj
+  scheme: TinkerSwift
+  configuration: Debug
+  derivedDataPath: .build-xcode
