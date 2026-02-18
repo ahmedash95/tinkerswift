@@ -12,7 +12,11 @@ struct EditorPaneView: View {
             showLineNumbers: workspaceState.showLineNumbers,
             wrapLines: workspaceState.wrapLines,
             highlightSelectedLine: workspaceState.highlightSelectedLine,
-            syntaxHighlighting: workspaceState.syntaxHighlighting
+            syntaxHighlighting: workspaceState.syntaxHighlighting,
+            projectPath: workspaceState.laravelProjectPath,
+            lspCompletionEnabled: workspaceState.lspCompletionEnabled,
+            lspAutoTriggerEnabled: workspaceState.lspAutoTriggerEnabled,
+            lspServerPathOverride: workspaceState.lspServerPathOverride
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }

@@ -9,7 +9,7 @@ struct SettingsView: View {
                 }
         }
         .padding(20)
-        .frame(width: 460, height: 300)
+        .frame(width: 520, height: 360)
     }
 }
 
@@ -27,6 +27,11 @@ private struct EditorSettingsTab: View {
             Toggle("Wrap Lines", isOn: $appModel.wrapLines)
             Toggle("Highlight Current Line", isOn: $appModel.highlightSelectedLine)
             Toggle("Syntax Highlighting", isOn: $appModel.syntaxHighlighting)
+            Toggle("LSP Completion", isOn: $appModel.lspCompletionEnabled)
+            Toggle("LSP Auto Trigger", isOn: $appModel.lspAutoTriggerEnabled)
+
+            TextField("PhpActor path override (optional)", text: $appModel.lspServerPathOverride)
+                .textFieldStyle(.roundedBorder)
 
             Spacer(minLength: 0)
         }

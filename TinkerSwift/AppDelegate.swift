@@ -15,6 +15,10 @@ final class TinkerSwiftAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Task {
+            await DebugConsoleCaptureService.shared.start()
+        }
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleNewTabRequest(_:)),

@@ -13,6 +13,7 @@
 		1E7D3EB22066CF47130B6446 /* TinkerSwiftState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E586EF248F30C2CD75ABA8A7 /* TinkerSwiftState.swift */; };
 		297DB11570450B821E3973B0 /* STTextView-Plugin-Neon in Frameworks */ = {isa = PBXBuildFile; productRef = 57055A4399366F807072010C /* STTextView-Plugin-Neon */; };
 		445CC1FD2078345E2201501D /* AppKitCodeEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1DE4774A9619733B2B7024 /* AppKitCodeEditor.swift */; };
+		5A3D9F1B7C2E4D8A9B0C1D2E /* DebugConsole.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F8E9D0C1B2A39485766A5B4 /* DebugConsole.swift */; };
 		85DDAF0FB6FFF116D11287D6 /* PHPExecutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */; };
 		917F845542B9FDBCE23A1635 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2CE3011C05D1288AB735216 /* ContentView.swift */; };
 		98012327C79B3EA468725CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CA41881C1CDF7F49F88F2711 /* Assets.xcassets */; };
@@ -32,6 +33,7 @@
 		2C5113908F526D1FF011EA45 /* ReplWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplWorkspaceView.swift; sourceTree = "<group>"; };
 		41FDE6BC6FB49F608A299BB4 /* EditorPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorPaneView.swift; sourceTree = "<group>"; };
 		681EE17BA70F9CAE63E1797F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		7F8E9D0C1B2A39485766A5B4 /* DebugConsole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugConsole.swift; sourceTree = "<group>"; };
 		896AA6D6A28BA0BDDB5C2A86 /* STTextView-Plugin-Neon */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "STTextView-Plugin-Neon"; path = "Vendor/STTextView-Plugin-Neon"; sourceTree = SOURCE_ROOT; };
 		9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPExecutionService.swift; sourceTree = "<group>"; };
 		A1EC35E5E2B4AD47E6CD99B1 /* ProjectSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectSidebarView.swift; sourceTree = "<group>"; };
@@ -91,6 +93,7 @@
 				E0FFC7EED87D1C94F2A0A3BA /* AppDelegate.swift */,
 				CA41881C1CDF7F49F88F2711 /* Assets.xcassets */,
 				C2CE3011C05D1288AB735216 /* ContentView.swift */,
+				7F8E9D0C1B2A39485766A5B4 /* DebugConsole.swift */,
 				B26BA1F3FC438294165BDAC4 /* ExecutionResultPresenter.swift */,
 				9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */,
 				681EE17BA70F9CAE63E1797F /* SettingsView.swift */,
@@ -203,6 +206,7 @@
 				FBF92F6B0DD066AD137046F3 /* AppDelegate.swift in Sources */,
 				445CC1FD2078345E2201501D /* AppKitCodeEditor.swift in Sources */,
 				917F845542B9FDBCE23A1635 /* ContentView.swift in Sources */,
+				5A3D9F1B7C2E4D8A9B0C1D2E /* DebugConsole.swift in Sources */,
 				010775AB09E90EB72A6C60AC /* EditorPaneView.swift in Sources */,
 				BA502650190E9270297CCBC3 /* ExecutionResultPresenter.swift in Sources */,
 				85DDAF0FB6FFF116D11287D6 /* PHPExecutionService.swift in Sources */,

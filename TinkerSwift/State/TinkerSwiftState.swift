@@ -264,10 +264,14 @@ final class AppModel {
         static let wrapLines = "editor.wrapLines"
         static let highlightSelectedLine = "editor.highlightSelectedLine"
         static let syntaxHighlighting = "editor.syntaxHighlighting"
+        static let lspCompletionEnabled = "editor.lspCompletionEnabled"
+        static let lspAutoTriggerEnabled = "editor.lspAutoTriggerEnabled"
+        static let lspServerPathOverride = "editor.lspServerPathOverride"
         static let laravelProjectPath = "laravel.projectPath"
         static let laravelProjectsJSON = "laravel.projectsJSON"
         static let runHistoryJSON = "laravel.runHistoryJSON"
         static let projectDraftsJSON = "editor.projectDraftsJSON"
+        static let legacyEditorFontSize = "editor.fontSize"
     }
 
     private static let minScale = 0.6
@@ -304,6 +308,18 @@ final class AppModel {
         didSet { defaults.set(syntaxHighlighting, forKey: DefaultsKey.syntaxHighlighting) }
     }
 
+    var lspCompletionEnabled: Bool {
+        didSet { defaults.set(lspCompletionEnabled, forKey: DefaultsKey.lspCompletionEnabled) }
+    }
+
+    var lspAutoTriggerEnabled: Bool {
+        didSet { defaults.set(lspAutoTriggerEnabled, forKey: DefaultsKey.lspAutoTriggerEnabled) }
+    }
+
+    var lspServerPathOverride: String {
+        didSet { defaults.set(lspServerPathOverride, forKey: DefaultsKey.lspServerPathOverride) }
+    }
+
     var projects: [LaravelProject] {
         didSet { persistProjects(projects) }
     }
@@ -319,11 +335,22 @@ final class AppModel {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
-        appUIScale = Self.sanitizedScale(defaults.object(forKey: DefaultsKey.appUIScale) as? Double ?? Self.defaultScale)
+        let persistedScale = Self.decodeDouble(defaults.object(forKey: DefaultsKey.appUIScale))
+        let normalizedScale = Self.sanitizedScale(persistedScale ?? Self.defaultScale)
+        appUIScale = normalizedScale
+        if persistedScale == nil || abs((persistedScale ?? normalizedScale) - normalizedScale) > 0.000_001 {
+            defaults.set(normalizedScale, forKey: DefaultsKey.appUIScale)
+        }
+
+        // Legacy key from older builds; keep clearing to avoid invalid stale values affecting startup.
+        defaults.removeObject(forKey: DefaultsKey.legacyEditorFontSize)
         showLineNumbers = defaults.object(forKey: DefaultsKey.showLineNumbers) as? Bool ?? true
         wrapLines = defaults.object(forKey: DefaultsKey.wrapLines) as? Bool ?? true
         highlightSelectedLine = defaults.object(forKey: DefaultsKey.highlightSelectedLine) as? Bool ?? true
         syntaxHighlighting = defaults.object(forKey: DefaultsKey.syntaxHighlighting) as? Bool ?? true
+        lspCompletionEnabled = defaults.object(forKey: DefaultsKey.lspCompletionEnabled) as? Bool ?? true
+        lspAutoTriggerEnabled = defaults.object(forKey: DefaultsKey.lspAutoTriggerEnabled) as? Bool ?? true
+        lspServerPathOverride = defaults.string(forKey: DefaultsKey.lspServerPathOverride) ?? ""
 
         let savedProjectsJSON = defaults.string(forKey: DefaultsKey.laravelProjectsJSON) ?? "[]"
         var initialProjects = Self.decodeProjects(from: savedProjectsJSON)
@@ -503,6 +530,17 @@ final class AppModel {
         }
         return min(max(value, minScale), maxScale)
     }
+
+    private static func decodeDouble(_ value: Any?) -> Double? {
+        switch value {
+        case let number as NSNumber:
+            return number.doubleValue
+        case let string as String:
+            return Double(string)
+        default:
+            return nil
+        }
+    }
 }
 
 @MainActor
@@ -623,6 +661,21 @@ return $users->toJson();
     var syntaxHighlighting: Bool {
         get { appModel.syntaxHighlighting }
         set { appModel.syntaxHighlighting = newValue }
+    }
+
+    var lspCompletionEnabled: Bool {
+        get { appModel.lspCompletionEnabled }
+        set { appModel.lspCompletionEnabled = newValue }
+    }
+
+    var lspAutoTriggerEnabled: Bool {
+        get { appModel.lspAutoTriggerEnabled }
+        set { appModel.lspAutoTriggerEnabled = newValue }
+    }
+
+    var lspServerPathOverride: String {
+        get { appModel.lspServerPathOverride }
+        set { appModel.lspServerPathOverride = newValue }
     }
 
     var projects: [LaravelProject] {

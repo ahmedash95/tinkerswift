@@ -61,6 +61,20 @@ private struct TinkerSwiftCommands: Commands {
             }
             .keyboardShortcut("0", modifiers: [.command])
         }
+
+        CommandMenu("Debug") {
+            Button("Open Console") {
+                DebugConsoleWindowManager.shared.show()
+            }
+            .keyboardShortcut("l", modifiers: [.command, .option])
+        }
+
+        CommandMenu("Editor") {
+            Button("Trigger Completion") {
+                NSApp.sendAction(#selector(NSStandardKeyBindingResponding.complete(_:)), to: nil, from: nil)
+            }
+            .keyboardShortcut("m", modifiers: [.command, .shift])
+        }
     }
 }
 
