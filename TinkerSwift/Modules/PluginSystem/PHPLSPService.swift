@@ -408,18 +408,29 @@ actor PHPLSPService: CompletionProviding {
     private func startServer(for projectPath: String) async throws {
         await stopServer(sendShutdown: true)
 
+        let projectURL = URL(fileURLWithPath: projectPath, isDirectory: true).standardizedFileURL
+        var isDirectory: ObjCBool = false
+        if !FileManager.default.fileExists(atPath: projectURL.path, isDirectory: &isDirectory) || !isDirectory.boolValue {
+            try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
+        }
+
         let process = Process()
         let stdinPipe = Pipe()
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
 
-        process.currentDirectoryURL = URL(fileURLWithPath: projectPath, isDirectory: true)
-        if serverPathOverride.isEmpty {
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["phpactor", "language-server"]
-        } else {
-            process.executableURL = URL(fileURLWithPath: serverPathOverride)
+        process.currentDirectoryURL = projectURL
+        process.environment = BinaryPathResolver.processEnvironment()
+
+        guard BinaryPathResolver.effectivePath(for: .php) != nil else {
+            throw LSPError.launchFailed("PHP binary not found in PATH. Configure PATH or install php.")
+        }
+
+        if let resolvedPhpactorPath = resolvedPhpactorPath() {
+            process.executableURL = URL(fileURLWithPath: resolvedPhpactorPath)
             process.arguments = ["language-server"]
+        } else {
+            throw LSPError.launchFailed("Phpactor binary not found in PATH. Configure path override in Settings > Binaries.")
         }
         log("starting phpactor cwd=\(projectPath) command=\(process.executableURL?.path() ?? "unknown") \(process.arguments?.joined(separator: " ") ?? "")")
 
@@ -463,7 +474,7 @@ actor PHPLSPService: CompletionProviding {
         self.rootProjectPath = projectPath
         self.sessions.removeAll(keepingCapacity: false)
 
-        let rootURL = URL(fileURLWithPath: projectPath, isDirectory: true).standardizedFileURL
+        let rootURL = projectURL
         let rootURI = rootURL.absoluteString
         let rootName = rootURL.lastPathComponent
         let hasComposerJSON = FileManager.default.fileExists(atPath: rootURL.appendingPathComponent("composer.json").path)
@@ -618,6 +629,18 @@ actor PHPLSPService: CompletionProviding {
 
         stdinHandle.write(headerData)
         stdinHandle.write(body)
+    }
+
+    private func resolvedPhpactorPath() -> String? {
+        let override = serverPathOverride.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !override.isEmpty {
+            let expanded = (override as NSString).expandingTildeInPath
+            if FileManager.default.isExecutableFile(atPath: expanded) {
+                return expanded
+            }
+            return nil
+        }
+        return BinaryPathResolver.effectivePath(for: .phpactor)
     }
 
     private func consumeStdout(_ data: Data) {

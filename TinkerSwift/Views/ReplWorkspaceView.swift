@@ -85,5 +85,9 @@ struct ReplWorkspaceView: View {
             DockerProjectSetupSheet()
                 .environment(workspaceState)
         }
+        .sheet(isPresented: $workspaceState.isShowingRenameProjectSheet) {
+            RenameProjectSheet()
+                .environment(workspaceState)
+        }
     }
 }

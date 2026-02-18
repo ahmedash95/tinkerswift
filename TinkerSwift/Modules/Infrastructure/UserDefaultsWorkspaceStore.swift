@@ -11,6 +11,9 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
         static let lspCompletionEnabled = "editor.lspCompletionEnabled"
         static let lspAutoTriggerEnabled = "editor.lspAutoTriggerEnabled"
         static let lspServerPathOverride = "editor.lspServerPathOverride"
+        static let phpBinaryPathOverride = "binary.php.overridePath"
+        static let dockerBinaryPathOverride = "binary.docker.overridePath"
+        static let laravelBinaryPathOverride = "binary.laravel.overridePath"
         static let selectedProjectID = "workspace.selectedProjectID"
         static let projectsV2JSON = "workspace.projectsV2JSON"
         static let runHistoryV2JSON = "workspace.runHistoryV2JSON"
@@ -61,7 +64,10 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
             syntaxHighlighting: defaults.object(forKey: DefaultsKey.syntaxHighlighting) as? Bool ?? true,
             lspCompletionEnabled: defaults.object(forKey: DefaultsKey.lspCompletionEnabled) as? Bool ?? true,
             lspAutoTriggerEnabled: defaults.object(forKey: DefaultsKey.lspAutoTriggerEnabled) as? Bool ?? true,
-            lspServerPathOverride: defaults.string(forKey: DefaultsKey.lspServerPathOverride) ?? ""
+            lspServerPathOverride: defaults.string(forKey: DefaultsKey.lspServerPathOverride) ?? "",
+            phpBinaryPathOverride: defaults.string(forKey: DefaultsKey.phpBinaryPathOverride) ?? "",
+            dockerBinaryPathOverride: defaults.string(forKey: DefaultsKey.dockerBinaryPathOverride) ?? "",
+            laravelBinaryPathOverride: defaults.string(forKey: DefaultsKey.laravelBinaryPathOverride) ?? ""
         )
 
         var projects = decodeProjectsV2(from: defaults.string(forKey: DefaultsKey.projectsV2JSON) ?? "[]")
@@ -132,6 +138,9 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
         defaults.set(settings.lspCompletionEnabled, forKey: DefaultsKey.lspCompletionEnabled)
         defaults.set(settings.lspAutoTriggerEnabled, forKey: DefaultsKey.lspAutoTriggerEnabled)
         defaults.set(settings.lspServerPathOverride, forKey: DefaultsKey.lspServerPathOverride)
+        defaults.set(settings.phpBinaryPathOverride, forKey: DefaultsKey.phpBinaryPathOverride)
+        defaults.set(settings.dockerBinaryPathOverride, forKey: DefaultsKey.dockerBinaryPathOverride)
+        defaults.set(settings.laravelBinaryPathOverride, forKey: DefaultsKey.laravelBinaryPathOverride)
     }
 
     func save(projects: [WorkspaceProject]) {
@@ -324,9 +333,16 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
     }
 
     private func normalizeProjectPath(_ raw: String) -> String {
-        var normalized = URL(fileURLWithPath: raw).standardizedFileURL.path
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ""
+        }
+        var normalized = URL(fileURLWithPath: trimmed).standardizedFileURL.path
         while normalized.count > 1 && normalized.hasSuffix("/") {
             normalized.removeLast()
+        }
+        if normalized == "/" {
+            return ""
         }
         return normalized
     }

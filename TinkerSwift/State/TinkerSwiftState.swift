@@ -178,11 +178,20 @@ actor LaravelProjectInstaller: DefaultProjectInstalling {
         let process = Process()
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
+        let environment = BinaryPathResolver.processEnvironment()
+        guard let laravelPath = BinaryPathResolver.effectivePath(for: .laravel) else {
+            return LaravelProjectInstallResult(
+                stdout: "",
+                stderr: "Laravel installer not found. Please install `laravel` and ensure it is available in PATH.",
+                exitCode: 127,
+                wasSuccessful: false
+            )
+        }
 
         process.currentDirectoryURL = parentURL
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.environment = environment
+        process.executableURL = URL(fileURLWithPath: laravelPath)
         process.arguments = [
-            "laravel",
             "new",
             projectURL.lastPathComponent,
             "--database=sqlite",
@@ -299,6 +308,18 @@ final class AppModel {
         didSet { persistSettings() }
     }
 
+    var phpBinaryPathOverride: String {
+        didSet { persistSettings() }
+    }
+
+    var dockerBinaryPathOverride: String {
+        didSet { persistSettings() }
+    }
+
+    var laravelBinaryPathOverride: String {
+        didSet { persistSettings() }
+    }
+
     var projects: [WorkspaceProject] {
         didSet { persistenceStore.save(projects: projects) }
     }
@@ -332,6 +353,9 @@ final class AppModel {
         lspCompletionEnabled = snapshot.settings.lspCompletionEnabled
         lspAutoTriggerEnabled = snapshot.settings.lspAutoTriggerEnabled
         lspServerPathOverride = snapshot.settings.lspServerPathOverride
+        phpBinaryPathOverride = snapshot.settings.phpBinaryPathOverride
+        dockerBinaryPathOverride = snapshot.settings.dockerBinaryPathOverride
+        laravelBinaryPathOverride = snapshot.settings.laravelBinaryPathOverride
         persistedProjectID = selectedProjectID
 
         projects = projectCatalogService.mergedProjects(snapshot.projects, selectedProjectID: selectedProjectID)
@@ -386,7 +410,10 @@ final class AppModel {
                 syntaxHighlighting: syntaxHighlighting,
                 lspCompletionEnabled: lspCompletionEnabled,
                 lspAutoTriggerEnabled: lspAutoTriggerEnabled,
-                lspServerPathOverride: lspServerPathOverride
+                lspServerPathOverride: lspServerPathOverride,
+                phpBinaryPathOverride: phpBinaryPathOverride,
+                dockerBinaryPathOverride: dockerBinaryPathOverride,
+                laravelBinaryPathOverride: laravelBinaryPathOverride
             )
         )
     }
@@ -445,6 +472,9 @@ return $users->toJson();
     var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
     var isPickingProjectFolder = false
     var isShowingDockerProjectSheet = false
+    var isShowingRenameProjectSheet = false
+    var renamingProjectID = ""
+    var renamingProjectName = ""
     var isRunning = false
     var isShowingDefaultProjectInstallSheet = false
     var isInstallingDefaultProject = false
@@ -561,7 +591,10 @@ return $users->toJson();
     }
 
     var isLSPAvailableForSelectedProject: Bool {
-        selectedProject?.isLocal == true
+        guard let selectedProject else { return false }
+        guard case let .local(path) = selectedProject.connection else { return false }
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 
     var completionProjectPath: String {
@@ -748,14 +781,38 @@ return $users->toJson();
         }
     }
 
-    func addDockerProject(container: DockerContainerSummary, projectPath: String) {
-        let project = WorkspaceProject.docker(
+    func addDockerProject(container: DockerContainerSummary, projectPath: String, displayName: String? = nil) {
+        var project = WorkspaceProject.docker(
             containerID: container.id,
             containerName: container.name,
             projectPath: projectPath
         )
+        let normalizedName = (displayName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !normalizedName.isEmpty {
+            project.name = normalizedName
+        }
         appModel.upsertProject(project)
         selectedProjectID = project.id
+    }
+
+    func beginRenamingProject(_ project: WorkspaceProject) {
+        guard canRenameProject(project) else { return }
+        renamingProjectID = project.id
+        renamingProjectName = project.name
+        isShowingRenameProjectSheet = true
+    }
+
+    func saveProjectRename() {
+        let normalizedName = renamingProjectName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedName.isEmpty else { return }
+        guard let existing = appModel.projects.first(where: { $0.id == renamingProjectID }) else {
+            isShowingRenameProjectSheet = false
+            return
+        }
+        var updated = existing
+        updated.name = normalizedName
+        appModel.upsertProject(updated)
+        isShowingRenameProjectSheet = false
     }
 
     func listDockerContainers() async -> [DockerContainerSummary] {
@@ -903,6 +960,10 @@ return $users->toJson();
 
     private func updateRunHistoryWindowTitle() {
         historyWindowController?.window?.title = runHistoryWindowTitle
+    }
+
+    func canRenameProject(_ project: WorkspaceProject) -> Bool {
+        project.id != defaultProject.id
     }
 
     private func loadCodeDraftForCurrentProject() {

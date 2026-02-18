@@ -3,9 +3,16 @@ import Foundation
 @MainActor
 struct WorkspacePathNormalizer {
     func normalizeProjectPath(_ raw: String) -> String {
-        var normalized = URL(fileURLWithPath: raw).standardizedFileURL.path
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ""
+        }
+        var normalized = URL(fileURLWithPath: trimmed).standardizedFileURL.path
         while normalized.count > 1 && normalized.hasSuffix("/") {
             normalized.removeLast()
+        }
+        if normalized == "/" {
+            return ""
         }
         return normalized
     }

@@ -176,6 +176,9 @@ struct AppSettings: Sendable {
     var lspCompletionEnabled: Bool
     var lspAutoTriggerEnabled: Bool
     var lspServerPathOverride: String
+    var phpBinaryPathOverride: String
+    var dockerBinaryPathOverride: String
+    var laravelBinaryPathOverride: String
 }
 
 struct WorkspacePersistenceSnapshot: Sendable {

@@ -155,6 +155,10 @@ struct ContentView: View {
             DockerProjectSetupSheet()
                 .environment(workspaceState)
         }
+        .sheet(isPresented: $workspaceState.isShowingRenameProjectSheet) {
+            RenameProjectSheet()
+                .environment(workspaceState)
+        }
         .focusedSceneValue(\.runCodeAction, workspaceState.runOrRestartFromShortcut)
         .focusedSceneValue(\.isRunningScript, workspaceState.isRunning)
     }
@@ -181,6 +185,7 @@ struct DockerProjectSetupSheet: View {
     @State private var searchText = ""
     @State private var containers: [DockerContainerSummary] = []
     @State private var selectedContainerID = ""
+    @State private var projectName = ""
     @State private var detectedProjectPath = ""
     @State private var isLoadingContainers = false
     @State private var isDetectingPath = false
@@ -201,7 +206,9 @@ struct DockerProjectSetupSheet: View {
     }
 
     private var canSave: Bool {
-        selectedContainer != nil && !detectedProjectPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        selectedContainer != nil &&
+            !projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !detectedProjectPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
@@ -262,6 +269,9 @@ struct DockerProjectSetupSheet: View {
                 .frame(minHeight: 170, maxHeight: 220)
             }
 
+            TextField("Project name", text: $projectName)
+                .textFieldStyle(.roundedBorder)
+
             HStack {
                 TextField("Project path in container", text: $detectedProjectPath)
                     .textFieldStyle(.roundedBorder)
@@ -305,6 +315,9 @@ struct DockerProjectSetupSheet: View {
         .task {
             await loadContainers()
         }
+        .onChange(of: selectedContainerID) { _, _ in
+            suggestProjectNameIfNeeded()
+        }
     }
 
     private func loadContainers() async {
@@ -315,8 +328,10 @@ struct DockerProjectSetupSheet: View {
 
         if selectedContainerID.isEmpty, let first = containers.first {
             selectedContainerID = first.id
+            suggestProjectNameIfNeeded()
         } else if !selectedContainerID.isEmpty, !containers.contains(where: { $0.id == selectedContainerID }) {
             selectedContainerID = containers.first?.id ?? ""
+            suggestProjectNameIfNeeded()
         }
     }
 
@@ -328,6 +343,7 @@ struct DockerProjectSetupSheet: View {
         isDetectingPath = false
         if let first = detected.first {
             detectedProjectPath = first
+            suggestProjectNameIfNeeded()
         } else {
             errorMessage = "Could not detect artisan project path automatically. Enter it manually."
         }
@@ -337,8 +353,53 @@ struct DockerProjectSetupSheet: View {
         guard let selectedContainer else { return }
         let path = detectedProjectPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !path.isEmpty else { return }
-        workspaceState.addDockerProject(container: selectedContainer, projectPath: path)
+        workspaceState.addDockerProject(container: selectedContainer, projectPath: path, displayName: projectName)
         dismiss()
+    }
+
+    private func suggestProjectNameIfNeeded() {
+        guard projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard let selectedContainer else { return }
+        let normalizedPath = detectedProjectPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalizedPath.isEmpty {
+            projectName = selectedContainer.name
+            return
+        }
+        let tail = URL(fileURLWithPath: normalizedPath).lastPathComponent
+        projectName = tail.isEmpty ? selectedContainer.name : "\(selectedContainer.name) · \(tail)"
+    }
+}
+
+struct RenameProjectSheet: View {
+    @Environment(WorkspaceState.self) private var workspaceState
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        @Bindable var workspaceState = workspaceState
+
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Rename Project")
+                .font(.title3.weight(.semibold))
+
+            TextField("Project name", text: $workspaceState.renamingProjectName)
+                .textFieldStyle(.roundedBorder)
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    workspaceState.isShowingRenameProjectSheet = false
+                    dismiss()
+                }
+                Button("Save") {
+                    workspaceState.saveProjectRename()
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(workspaceState.renamingProjectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(18)
+        .frame(width: 420)
     }
 }
 

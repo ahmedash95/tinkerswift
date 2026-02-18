@@ -95,8 +95,20 @@ done
             let stderrPipe = Pipe()
             let stdinPipe = Pipe()
 
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["docker"] + arguments
+            process.environment = BinaryPathResolver.processEnvironment()
+            if let dockerPath = BinaryPathResolver.effectivePath(for: .docker) {
+                process.executableURL = URL(fileURLWithPath: dockerPath)
+                process.arguments = arguments
+            } else {
+                continuation.resume(
+                    returning: DockerCommandResult(
+                        stdout: "",
+                        stderr: "docker binary not found. Checked PATH=\(process.environment?["PATH"] ?? "")",
+                        exitCode: 127
+                    )
+                )
+                return
+            }
             process.standardOutput = stdoutPipe
             process.standardError = stderrPipe
             process.standardInput = stdinPipe
@@ -270,10 +282,22 @@ try {
         let stderrPipe = Pipe()
         let startedAt = Date()
 
+        guard let phpPath = BinaryPathResolver.effectivePath(for: .php) else {
+            return PHPExecutionResult(
+                command: "php \(runnerFileName)",
+                stdout: "",
+                stderr: "PHP binary not found. Please install php or add it to PATH.",
+                exitCode: 127,
+                durationMs: nil,
+                peakMemoryBytes: nil,
+                wasStopped: false
+            )
+        }
+
         process.currentDirectoryURL = projectURL
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.environment = BinaryPathResolver.processEnvironment()
+        process.executableURL = URL(fileURLWithPath: phpPath)
         process.arguments = [
-            "php",
             "-d",
             "display_errors=1",
             "-d",
@@ -391,9 +415,21 @@ try {
         let stderrPipe = Pipe()
         let stdinPipe = Pipe()
 
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        guard let dockerPath = BinaryPathResolver.effectivePath(for: .docker) else {
+            return PHPExecutionResult(
+                command: "docker exec -i -w \(config.projectPath) \(config.containerID) php",
+                stdout: "",
+                stderr: "Docker binary not found. Please install docker or add it to PATH.",
+                exitCode: 127,
+                durationMs: nil,
+                peakMemoryBytes: nil,
+                wasStopped: false
+            )
+        }
+
+        process.environment = BinaryPathResolver.processEnvironment()
+        process.executableURL = URL(fileURLWithPath: dockerPath)
         process.arguments = [
-            "docker",
             "exec",
             "-i",
             "-w",

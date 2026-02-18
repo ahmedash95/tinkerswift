@@ -16,6 +16,13 @@ struct ProjectSidebarView: View {
                         ForEach(workspaceState.projects) { project in
                             Label(project.name, systemImage: project.connection.kind == .docker ? "shippingbox.fill" : "folder")
                                 .tag(project.id)
+                                .contextMenu {
+                                    if workspaceState.canRenameProject(project) {
+                                        Button("Rename") {
+                                            workspaceState.beginRenamingProject(project)
+                                        }
+                                    }
+                                }
                         }
                     }
                 }
