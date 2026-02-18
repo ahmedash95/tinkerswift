@@ -11,7 +11,7 @@ struct PHPExecutionResult {
     let wasStopped: Bool
 }
 
-actor PHPExecutionRunner {
+actor PHPExecutionRunner: CodeExecutionProviding {
     private struct RuntimeMetrics: Decodable {
         let durationMs: Double
         let peakMemoryBytes: UInt64
@@ -182,7 +182,7 @@ try {
         }
     }
 
-    func stop() {
+    func stop() async {
         if let runID = activeRunID {
             stopRequestedRunIDs.insert(runID)
         }

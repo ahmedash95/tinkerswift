@@ -79,12 +79,17 @@ private struct TinkerSwiftCommands: Commands {
 }
 
 struct WorkspaceRootView: View {
-    let appModel: AppModel
+    private let appModel: AppModel
     @State private var workspaceState: WorkspaceState
 
     init(appModel: AppModel) {
         self.appModel = appModel
         _workspaceState = State(initialValue: WorkspaceState(appModel: appModel))
+    }
+
+    init(container: AppContainer) {
+        self.appModel = container.appModel
+        _workspaceState = State(initialValue: container.makeWorkspaceState())
     }
 
     var body: some View {
@@ -97,7 +102,7 @@ struct WorkspaceRootView: View {
 @main
 struct TinkerSwiftApp: App {
     @NSApplicationDelegateAdaptor(TinkerSwiftAppDelegate.self) private var appDelegate
-    @State private var appModel = AppModel()
+    @State private var container = AppContainer()
 
     init() {
         NSWindow.allowsAutomaticWindowTabbing = false
@@ -105,18 +110,18 @@ struct TinkerSwiftApp: App {
 
     var body: some Scene {
         WindowGroup {
-            WorkspaceRootView(appModel: appModel)
+            WorkspaceRootView(container: container)
                 .onAppear {
-                    appDelegate.setAppModel(appModel)
+                    appDelegate.setAppModel(container.appModel)
                 }
         }
         .commands {
-            TinkerSwiftCommands(appModel: appModel)
+            TinkerSwiftCommands(appModel: container.appModel)
         }
 
         Settings {
             SettingsView()
-                .environment(appModel)
+                .environment(container.appModel)
         }
     }
 }

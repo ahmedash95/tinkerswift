@@ -11,6 +11,13 @@
 		04AFEEC03120232C61CD5B87 /* ResultPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 147DD2B832E03877D14035A9 /* ResultPaneView.swift */; };
 		0BB649EE698FA066422C6CCE /* ReplWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C5113908F526D1FF011EA45 /* ReplWorkspaceView.swift */; };
 		1E7D3EB22066CF47130B6446 /* TinkerSwiftState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E586EF248F30C2CD75ABA8A7 /* TinkerSwiftState.swift */; };
+		AA100101AA100101AA100101 /* Contracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100001AA100001AA100001 /* Contracts.swift */; };
+		AA100102AA100102AA100102 /* LanguagePluginRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100002AA100002AA100002 /* LanguagePluginRegistry.swift */; };
+		AA100107AA100107AA100107 /* PHPLSPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100007AA100007AA100007 /* PHPLSPService.swift */; };
+		AA100103AA100103AA100103 /* UserDefaultsWorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100003AA100003AA100003 /* UserDefaultsWorkspaceStore.swift */; };
+		AA100104AA100104AA100104 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100004AA100004AA100004 /* AppContainer.swift */; };
+		AA100105AA100105AA100105 /* WorkspaceDataServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100005AA100005AA100005 /* WorkspaceDataServices.swift */; };
+		AA100106AA100106AA100106 /* EditorCompletionOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100006AA100006AA100006 /* EditorCompletionOrchestrator.swift */; };
 		297DB11570450B821E3973B0 /* STTextView-Plugin-Neon in Frameworks */ = {isa = PBXBuildFile; productRef = 57055A4399366F807072010C /* STTextView-Plugin-Neon */; };
 		445CC1FD2078345E2201501D /* AppKitCodeEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1DE4774A9619733B2B7024 /* AppKitCodeEditor.swift */; };
 		5A3D9F1B7C2E4D8A9B0C1D2E /* DebugConsole.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F8E9D0C1B2A39485766A5B4 /* DebugConsole.swift */; };
@@ -36,6 +43,13 @@
 		7F8E9D0C1B2A39485766A5B4 /* DebugConsole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugConsole.swift; sourceTree = "<group>"; };
 		896AA6D6A28BA0BDDB5C2A86 /* STTextView-Plugin-Neon */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "STTextView-Plugin-Neon"; path = "Vendor/STTextView-Plugin-Neon"; sourceTree = SOURCE_ROOT; };
 		9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPExecutionService.swift; sourceTree = "<group>"; };
+		AA100001AA100001AA100001 /* Contracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Contracts.swift; sourceTree = "<group>"; };
+		AA100002AA100002AA100002 /* LanguagePluginRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguagePluginRegistry.swift; sourceTree = "<group>"; };
+		AA100007AA100007AA100007 /* PHPLSPService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPLSPService.swift; sourceTree = "<group>"; };
+		AA100003AA100003AA100003 /* UserDefaultsWorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsWorkspaceStore.swift; sourceTree = "<group>"; };
+		AA100004AA100004AA100004 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
+		AA100005AA100005AA100005 /* WorkspaceDataServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceDataServices.swift; sourceTree = "<group>"; };
+		AA100006AA100006AA100006 /* EditorCompletionOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCompletionOrchestrator.swift; sourceTree = "<group>"; };
 		A1EC35E5E2B4AD47E6CD99B1 /* ProjectSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectSidebarView.swift; sourceTree = "<group>"; };
 		A20CA221126C370AB32A0D91 /* WorkspaceWindowFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceWindowFactory.swift; sourceTree = "<group>"; };
 		B26BA1F3FC438294165BDAC4 /* ExecutionResultPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionResultPresenter.swift; sourceTree = "<group>"; };
@@ -99,10 +113,57 @@
 				681EE17BA70F9CAE63E1797F /* SettingsView.swift */,
 				FA7C47FE7E31C32BEEF95CB4 /* TinkerSwiftApp.swift */,
 				A20CA221126C370AB32A0D91 /* WorkspaceWindowFactory.swift */,
+				AA100010AA100010AA100010 /* Modules */,
 				46718E352D49812C3EE86757 /* State */,
 				A14755A640BD23A122BE1A5E /* Views */,
 			);
 			path = TinkerSwift;
+			sourceTree = "<group>";
+		};
+		AA100010AA100010AA100010 /* Modules */ = {
+			isa = PBXGroup;
+			children = (
+				AA100014AA100014AA100014 /* Application */,
+				AA100011AA100011AA100011 /* CoreContracts */,
+				AA100013AA100013AA100013 /* Infrastructure */,
+				AA100012AA100012AA100012 /* PluginSystem */,
+			);
+			path = Modules;
+			sourceTree = "<group>";
+		};
+		AA100011AA100011AA100011 /* CoreContracts */ = {
+			isa = PBXGroup;
+			children = (
+				AA100001AA100001AA100001 /* Contracts.swift */,
+			);
+			path = CoreContracts;
+			sourceTree = "<group>";
+		};
+		AA100012AA100012AA100012 /* PluginSystem */ = {
+			isa = PBXGroup;
+			children = (
+				AA100002AA100002AA100002 /* LanguagePluginRegistry.swift */,
+				AA100007AA100007AA100007 /* PHPLSPService.swift */,
+			);
+			path = PluginSystem;
+			sourceTree = "<group>";
+		};
+		AA100013AA100013AA100013 /* Infrastructure */ = {
+			isa = PBXGroup;
+			children = (
+				AA100003AA100003AA100003 /* UserDefaultsWorkspaceStore.swift */,
+			);
+			path = Infrastructure;
+			sourceTree = "<group>";
+		};
+		AA100014AA100014AA100014 /* Application */ = {
+			isa = PBXGroup;
+			children = (
+				AA100004AA100004AA100004 /* AppContainer.swift */,
+				AA100006AA100006AA100006 /* EditorCompletionOrchestrator.swift */,
+				AA100005AA100005AA100005 /* WorkspaceDataServices.swift */,
+			);
+			path = Application;
 			sourceTree = "<group>";
 		};
 		A14755A640BD23A122BE1A5E /* Views */ = {
@@ -210,12 +271,19 @@
 				010775AB09E90EB72A6C60AC /* EditorPaneView.swift in Sources */,
 				BA502650190E9270297CCBC3 /* ExecutionResultPresenter.swift in Sources */,
 				85DDAF0FB6FFF116D11287D6 /* PHPExecutionService.swift in Sources */,
+				AA100104AA100104AA100104 /* AppContainer.swift in Sources */,
+				AA100101AA100101AA100101 /* Contracts.swift in Sources */,
+				AA100106AA100106AA100106 /* EditorCompletionOrchestrator.swift in Sources */,
 				B1C29B9E5FB3E66BAA809905 /* ProjectSidebarView.swift in Sources */,
 				0BB649EE698FA066422C6CCE /* ReplWorkspaceView.swift in Sources */,
 				04AFEEC03120232C61CD5B87 /* ResultPaneView.swift in Sources */,
+				AA100102AA100102AA100102 /* LanguagePluginRegistry.swift in Sources */,
+				AA100107AA100107AA100107 /* PHPLSPService.swift in Sources */,
 				99017869037F7E3C14147365 /* SettingsView.swift in Sources */,
 				D77CB2CA91C6B2466388DDA9 /* TinkerSwiftApp.swift in Sources */,
 				1E7D3EB22066CF47130B6446 /* TinkerSwiftState.swift in Sources */,
+				AA100103AA100103AA100103 /* UserDefaultsWorkspaceStore.swift in Sources */,
+				AA100105AA100105AA100105 /* WorkspaceDataServices.swift in Sources */,
 				E5BFC27A630BCDE87162912E /* WorkspaceWindowFactory.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

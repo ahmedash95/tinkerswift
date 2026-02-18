@@ -166,7 +166,7 @@ struct LaravelProjectInstallResult {
     }
 }
 
-actor LaravelProjectInstaller {
+actor LaravelProjectInstaller: DefaultProjectInstalling {
     func installDefaultProject(at projectPath: String) async -> LaravelProjectInstallResult {
         let projectURL = URL(fileURLWithPath: projectPath)
         let parentURL = projectURL.deletingLastPathComponent()
@@ -258,28 +258,14 @@ actor LaravelProjectInstaller {
 @MainActor
 @Observable
 final class AppModel {
-    private enum DefaultsKey {
-        static let appUIScale = "app.uiScale"
-        static let showLineNumbers = "editor.showLineNumbers"
-        static let wrapLines = "editor.wrapLines"
-        static let highlightSelectedLine = "editor.highlightSelectedLine"
-        static let syntaxHighlighting = "editor.syntaxHighlighting"
-        static let lspCompletionEnabled = "editor.lspCompletionEnabled"
-        static let lspAutoTriggerEnabled = "editor.lspAutoTriggerEnabled"
-        static let lspServerPathOverride = "editor.lspServerPathOverride"
-        static let laravelProjectPath = "laravel.projectPath"
-        static let laravelProjectsJSON = "laravel.projectsJSON"
-        static let runHistoryJSON = "laravel.runHistoryJSON"
-        static let projectDraftsJSON = "editor.projectDraftsJSON"
-        static let legacyEditorFontSize = "editor.fontSize"
-    }
-
     private static let minScale = 0.6
     private static let maxScale = 3.0
     private static let defaultScale = 1.0
-    private static let maxRunHistoryPerProject = 100
-
-    private let defaults: UserDefaults
+    private let persistenceStore: any WorkspacePersistenceStore
+    private let projectCatalogService: ProjectCatalogService
+    private let runHistoryService: RunHistoryService
+    private let draftService: EditorDraftService
+    private var persistedProjectPath = ""
 
     var appUIScale: Double {
         didSet {
@@ -288,86 +274,76 @@ final class AppModel {
                 appUIScale = normalized
                 return
             }
-            defaults.set(normalized, forKey: DefaultsKey.appUIScale)
+            persistSettings()
         }
     }
 
     var showLineNumbers: Bool {
-        didSet { defaults.set(showLineNumbers, forKey: DefaultsKey.showLineNumbers) }
+        didSet { persistSettings() }
     }
 
     var wrapLines: Bool {
-        didSet { defaults.set(wrapLines, forKey: DefaultsKey.wrapLines) }
+        didSet { persistSettings() }
     }
 
     var highlightSelectedLine: Bool {
-        didSet { defaults.set(highlightSelectedLine, forKey: DefaultsKey.highlightSelectedLine) }
+        didSet { persistSettings() }
     }
 
     var syntaxHighlighting: Bool {
-        didSet { defaults.set(syntaxHighlighting, forKey: DefaultsKey.syntaxHighlighting) }
+        didSet { persistSettings() }
     }
 
     var lspCompletionEnabled: Bool {
-        didSet { defaults.set(lspCompletionEnabled, forKey: DefaultsKey.lspCompletionEnabled) }
+        didSet { persistSettings() }
     }
 
     var lspAutoTriggerEnabled: Bool {
-        didSet { defaults.set(lspAutoTriggerEnabled, forKey: DefaultsKey.lspAutoTriggerEnabled) }
+        didSet { persistSettings() }
     }
 
     var lspServerPathOverride: String {
-        didSet { defaults.set(lspServerPathOverride, forKey: DefaultsKey.lspServerPathOverride) }
+        didSet { persistSettings() }
     }
 
     var projects: [LaravelProject] {
-        didSet { persistProjects(projects) }
+        didSet { persistenceStore.save(projects: projects) }
     }
 
     var runHistory: [ProjectRunHistoryItem] {
-        didSet { persistRunHistory(runHistory) }
+        didSet { persistenceStore.save(runHistory: runHistory) }
     }
 
     var projectDraftsByPath: [String: String] {
-        didSet { persistProjectDrafts(projectDraftsByPath) }
+        didSet { persistenceStore.save(projectDraftsByPath: projectDraftsByPath) }
     }
 
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
+    init(
+        persistenceStore: any WorkspacePersistenceStore = UserDefaultsWorkspaceStore(),
+        projectCatalogService: ProjectCatalogService = ProjectCatalogService(),
+        runHistoryService: RunHistoryService = RunHistoryService(),
+        draftService: EditorDraftService = EditorDraftService()
+    ) {
+        self.persistenceStore = persistenceStore
+        self.projectCatalogService = projectCatalogService
+        self.runHistoryService = runHistoryService
+        self.draftService = draftService
 
-        let persistedScale = Self.decodeDouble(defaults.object(forKey: DefaultsKey.appUIScale))
-        let normalizedScale = Self.sanitizedScale(persistedScale ?? Self.defaultScale)
-        appUIScale = normalizedScale
-        if persistedScale == nil || abs((persistedScale ?? normalizedScale) - normalizedScale) > 0.000_001 {
-            defaults.set(normalizedScale, forKey: DefaultsKey.appUIScale)
-        }
+        let snapshot = persistenceStore.load()
+        let selectedProjectPath = projectCatalogService.normalize(snapshot.selectedProjectPath)
+        appUIScale = Self.sanitizedScale(snapshot.settings.appUIScale)
+        showLineNumbers = snapshot.settings.showLineNumbers
+        wrapLines = snapshot.settings.wrapLines
+        highlightSelectedLine = snapshot.settings.highlightSelectedLine
+        syntaxHighlighting = snapshot.settings.syntaxHighlighting
+        lspCompletionEnabled = snapshot.settings.lspCompletionEnabled
+        lspAutoTriggerEnabled = snapshot.settings.lspAutoTriggerEnabled
+        lspServerPathOverride = snapshot.settings.lspServerPathOverride
+        persistedProjectPath = selectedProjectPath
 
-        // Legacy key from older builds; keep clearing to avoid invalid stale values affecting startup.
-        defaults.removeObject(forKey: DefaultsKey.legacyEditorFontSize)
-        showLineNumbers = defaults.object(forKey: DefaultsKey.showLineNumbers) as? Bool ?? true
-        wrapLines = defaults.object(forKey: DefaultsKey.wrapLines) as? Bool ?? true
-        highlightSelectedLine = defaults.object(forKey: DefaultsKey.highlightSelectedLine) as? Bool ?? true
-        syntaxHighlighting = defaults.object(forKey: DefaultsKey.syntaxHighlighting) as? Bool ?? true
-        lspCompletionEnabled = defaults.object(forKey: DefaultsKey.lspCompletionEnabled) as? Bool ?? true
-        lspAutoTriggerEnabled = defaults.object(forKey: DefaultsKey.lspAutoTriggerEnabled) as? Bool ?? true
-        lspServerPathOverride = defaults.string(forKey: DefaultsKey.lspServerPathOverride) ?? ""
-
-        let savedProjectsJSON = defaults.string(forKey: DefaultsKey.laravelProjectsJSON) ?? "[]"
-        var initialProjects = Self.decodeProjects(from: savedProjectsJSON)
-
-        let savedProjectPath = Self.normalizeProjectPath(defaults.string(forKey: DefaultsKey.laravelProjectPath) ?? "")
-        if !savedProjectPath.isEmpty, !initialProjects.contains(where: { $0.path == savedProjectPath }) {
-            initialProjects.append(LaravelProject(path: savedProjectPath))
-            initialProjects.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        }
-
-        projects = initialProjects
-
-        let savedRunHistoryJSON = defaults.string(forKey: DefaultsKey.runHistoryJSON) ?? "[]"
-        runHistory = Self.decodeRunHistory(from: savedRunHistoryJSON)
-
-        let savedProjectDraftsJSON = defaults.string(forKey: DefaultsKey.projectDraftsJSON) ?? "{}"
-        projectDraftsByPath = Self.decodeProjectDrafts(from: savedProjectDraftsJSON)
+        projects = projectCatalogService.mergedProjects(snapshot.projects, selectedProjectPath: selectedProjectPath)
+        runHistory = snapshot.runHistory
+        projectDraftsByPath = snapshot.projectDraftsByPath
     }
 
     var scale: CGFloat {
@@ -375,153 +351,47 @@ final class AppModel {
     }
 
     var lastSelectedProjectPath: String {
-        Self.normalizeProjectPath(defaults.string(forKey: DefaultsKey.laravelProjectPath) ?? "")
+        persistedProjectPath
     }
 
     func setLastSelectedProjectPath(_ path: String) {
-        defaults.set(Self.normalizeProjectPath(path), forKey: DefaultsKey.laravelProjectPath)
+        persistedProjectPath = projectCatalogService.normalize(path)
+        persistenceStore.save(selectedProjectPath: persistedProjectPath)
     }
 
     func addProject(_ path: String) {
-        let normalizedPath = Self.normalizeProjectPath(path)
-        guard !normalizedPath.isEmpty else { return }
-
-        if !projects.contains(where: { $0.path == normalizedPath }) {
-            projects.append(LaravelProject(path: normalizedPath))
-            projects.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        }
+        projects = projectCatalogService.addProject(path: path, to: projects)
     }
 
     func recordRunHistory(projectPath: String, code: String, executedAt: Date = Date()) {
-        let normalizedPath = Self.normalizeProjectPath(projectPath)
-        guard !normalizedPath.isEmpty else { return }
-
-        let historyEntry = ProjectRunHistoryItem(
-            id: UUID().uuidString,
-            projectPath: normalizedPath,
-            code: code,
-            executedAt: executedAt
-        )
-
-        var currentProjectHistory = runHistory.filter { $0.projectPath == normalizedPath }
-        currentProjectHistory.insert(historyEntry, at: 0)
-
-        if currentProjectHistory.count > Self.maxRunHistoryPerProject {
-            currentProjectHistory = Array(currentProjectHistory.prefix(Self.maxRunHistoryPerProject))
-        }
-
-        let otherProjectsHistory = runHistory.filter { $0.projectPath != normalizedPath }
-        runHistory = otherProjectsHistory + currentProjectHistory
+        runHistory = runHistoryService.record(projectPath: projectPath, code: code, executedAt: executedAt, in: runHistory)
     }
 
     func runHistory(for projectPath: String) -> [ProjectRunHistoryItem] {
-        let normalizedPath = Self.normalizeProjectPath(projectPath)
-        guard !normalizedPath.isEmpty else { return [] }
-
-        return runHistory
-            .filter { $0.projectPath == normalizedPath }
-            .sorted { $0.executedAt > $1.executedAt }
+        runHistoryService.history(for: projectPath, in: runHistory)
     }
 
     func editorDraft(for projectPath: String) -> String? {
-        let normalizedPath = Self.normalizeProjectPath(projectPath)
-        guard !normalizedPath.isEmpty else { return nil }
-        return projectDraftsByPath[normalizedPath]
+        draftService.draft(for: projectPath, draftsByPath: projectDraftsByPath)
     }
 
     func setEditorDraft(_ code: String, for projectPath: String) {
-        let normalizedPath = Self.normalizeProjectPath(projectPath)
-        guard !normalizedPath.isEmpty else { return }
-        projectDraftsByPath[normalizedPath] = code
+        projectDraftsByPath = draftService.settingDraft(code, for: projectPath, draftsByPath: projectDraftsByPath)
     }
 
-    private func persistProjects(_ projects: [LaravelProject]) {
-        let encoder = JSONEncoder()
-        guard let data = try? encoder.encode(projects),
-              let json = String(data: data, encoding: .utf8) else {
-            return
-        }
-
-        defaults.set(json, forKey: DefaultsKey.laravelProjectsJSON)
-    }
-
-    private func persistRunHistory(_ history: [ProjectRunHistoryItem]) {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        guard let data = try? encoder.encode(history),
-              let json = String(data: data, encoding: .utf8) else {
-            return
-        }
-
-        defaults.set(json, forKey: DefaultsKey.runHistoryJSON)
-    }
-
-    private func persistProjectDrafts(_ draftsByPath: [String: String]) {
-        let encoder = JSONEncoder()
-        guard let data = try? encoder.encode(draftsByPath),
-              let json = String(data: data, encoding: .utf8) else {
-            return
-        }
-
-        defaults.set(json, forKey: DefaultsKey.projectDraftsJSON)
-    }
-
-    private static func decodeProjects(from json: String) -> [LaravelProject] {
-        guard let data = json.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([LaravelProject].self, from: data) else {
-            return []
-        }
-
-        var seen = Set<String>()
-        return decoded.compactMap { project in
-            let normalizedPath = normalizeProjectPath(project.path)
-            guard !normalizedPath.isEmpty else { return nil }
-            guard seen.insert(normalizedPath).inserted else { return nil }
-            return LaravelProject(path: normalizedPath)
-        }
-    }
-
-    private static func decodeRunHistory(from json: String) -> [ProjectRunHistoryItem] {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        guard let data = json.data(using: .utf8),
-              let decoded = try? decoder.decode([ProjectRunHistoryItem].self, from: data) else {
-            return []
-        }
-
-        return decoded.compactMap { item in
-            let normalizedPath = normalizeProjectPath(item.projectPath)
-            guard !normalizedPath.isEmpty else { return nil }
-            return ProjectRunHistoryItem(
-                id: item.id,
-                projectPath: normalizedPath,
-                code: item.code,
-                executedAt: item.executedAt
+    private func persistSettings() {
+        persistenceStore.save(
+            settings: AppSettings(
+                appUIScale: appUIScale,
+                showLineNumbers: showLineNumbers,
+                wrapLines: wrapLines,
+                highlightSelectedLine: highlightSelectedLine,
+                syntaxHighlighting: syntaxHighlighting,
+                lspCompletionEnabled: lspCompletionEnabled,
+                lspAutoTriggerEnabled: lspAutoTriggerEnabled,
+                lspServerPathOverride: lspServerPathOverride
             )
-        }
-    }
-
-    private static func decodeProjectDrafts(from json: String) -> [String: String] {
-        guard let data = json.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([String: String].self, from: data) else {
-            return [:]
-        }
-
-        var sanitized: [String: String] = [:]
-        for (path, draft) in decoded {
-            let normalizedPath = normalizeProjectPath(path)
-            guard !normalizedPath.isEmpty else { continue }
-            sanitized[normalizedPath] = draft
-        }
-        return sanitized
-    }
-
-    private static func normalizeProjectPath(_ raw: String) -> String {
-        var normalized = URL(fileURLWithPath: raw).standardizedFileURL.path
-        while normalized.count > 1 && normalized.hasSuffix("/") {
-            normalized.removeLast()
-        }
-        return normalized
+        )
     }
 
     private static func sanitizedScale(_ value: Double) -> Double {
@@ -529,17 +399,6 @@ final class AppModel {
             return defaultScale
         }
         return min(max(value, minScale), maxScale)
-    }
-
-    private static func decodeDouble(_ value: Any?) -> Double? {
-        switch value {
-        case let number as NSNumber:
-            return number.doubleValue
-        case let string as String:
-            return Double(string)
-        default:
-            return nil
-        }
     }
 }
 
@@ -579,8 +438,8 @@ return $users->toJson();
     }()
 
     let appModel: AppModel
-    private let runner = PHPExecutionRunner()
-    private let defaultProjectInstaller = LaravelProjectInstaller()
+    private let executionProvider: any CodeExecutionProviding
+    private let defaultProjectInstaller: any DefaultProjectInstalling
     private let defaultProject = LaravelProject(path: WorkspaceState.defaultProjectPath)
     private var historyWindowController: NSWindowController?
     private var historyWindowCloseObserver: NSObjectProtocol?
@@ -619,8 +478,14 @@ return $users->toJson();
         }
     }
 
-    init(appModel: AppModel) {
+    init(
+        appModel: AppModel,
+        executionProvider: any CodeExecutionProviding = PHPExecutionRunner(),
+        defaultProjectInstaller: any DefaultProjectInstalling = LaravelProjectInstaller()
+    ) {
         self.appModel = appModel
+        self.executionProvider = executionProvider
+        self.defaultProjectInstaller = defaultProjectInstaller
         let savedPath = appModel.lastSelectedProjectPath
         if savedPath.isEmpty {
             laravelProjectPath = defaultProject.path
@@ -633,9 +498,9 @@ return $users->toJson();
     }
 
     deinit {
-        let runner = self.runner
+        let executionProvider = self.executionProvider
         Task {
-            await runner.stop()
+            await executionProvider.stop()
         }
     }
 
@@ -954,7 +819,7 @@ return $users->toJson();
             resultMessage = "Running script..."
             appModel.recordRunHistory(projectPath: laravelProjectPath, code: code)
 
-            let execution = await runner.run(code: code, projectPath: laravelProjectPath)
+            let execution = await executionProvider.run(code: code, projectPath: laravelProjectPath)
             latestExecution = execution
 
             if execution.wasStopped {
@@ -980,8 +845,9 @@ return $users->toJson();
     }
 
     private func stopRunningScript(statusMessage: String = "Stopping script...") {
+        let executionProvider = self.executionProvider
         Task {
-            await runner.stop()
+            await executionProvider.stop()
         }
         resultMessage = statusMessage
     }
