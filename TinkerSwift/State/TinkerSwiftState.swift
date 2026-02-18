@@ -64,7 +64,7 @@ private struct RunHistoryWindowView: View {
         .onAppear {
             workspaceState.selectRunHistoryItemIfNeeded()
         }
-        .onChange(of: workspaceState.laravelProjectPath) { _, _ in
+        .onChange(of: workspaceState.selectedProjectID) { _, _ in
             workspaceState.selectRunHistoryItemIfNeeded()
         }
         .navigationSplitViewStyle(.balanced)
@@ -133,13 +133,6 @@ enum RawStreamMode: String, CaseIterable {
     }
 }
 
-struct LaravelProject: Codable, Hashable, Identifiable {
-    let path: String
-
-    var id: String { path }
-    var name: String { URL(fileURLWithPath: path).lastPathComponent }
-}
-
 struct RunMetrics {
     let durationMs: Double?
     let peakMemoryBytes: UInt64?
@@ -147,7 +140,7 @@ struct RunMetrics {
 
 struct ProjectRunHistoryItem: Codable, Hashable, Identifiable {
     let id: String
-    let projectPath: String
+    let projectID: String
     let code: String
     let executedAt: Date
 }
@@ -265,7 +258,7 @@ final class AppModel {
     private let projectCatalogService: ProjectCatalogService
     private let runHistoryService: RunHistoryService
     private let draftService: EditorDraftService
-    private var persistedProjectPath = ""
+    private var persistedProjectID = ""
 
     var appUIScale: Double {
         didSet {
@@ -306,7 +299,7 @@ final class AppModel {
         didSet { persistSettings() }
     }
 
-    var projects: [LaravelProject] {
+    var projects: [WorkspaceProject] {
         didSet { persistenceStore.save(projects: projects) }
     }
 
@@ -314,8 +307,8 @@ final class AppModel {
         didSet { persistenceStore.save(runHistory: runHistory) }
     }
 
-    var projectDraftsByPath: [String: String] {
-        didSet { persistenceStore.save(projectDraftsByPath: projectDraftsByPath) }
+    var projectDraftsByProjectID: [String: String] {
+        didSet { persistenceStore.save(projectDraftsByProjectID: projectDraftsByProjectID) }
     }
 
     init(
@@ -330,7 +323,7 @@ final class AppModel {
         self.draftService = draftService
 
         let snapshot = persistenceStore.load()
-        let selectedProjectPath = projectCatalogService.normalize(snapshot.selectedProjectPath)
+        let selectedProjectID = snapshot.selectedProjectID.trimmingCharacters(in: .whitespacesAndNewlines)
         appUIScale = Self.sanitizedScale(snapshot.settings.appUIScale)
         showLineNumbers = snapshot.settings.showLineNumbers
         wrapLines = snapshot.settings.wrapLines
@@ -339,44 +332,48 @@ final class AppModel {
         lspCompletionEnabled = snapshot.settings.lspCompletionEnabled
         lspAutoTriggerEnabled = snapshot.settings.lspAutoTriggerEnabled
         lspServerPathOverride = snapshot.settings.lspServerPathOverride
-        persistedProjectPath = selectedProjectPath
+        persistedProjectID = selectedProjectID
 
-        projects = projectCatalogService.mergedProjects(snapshot.projects, selectedProjectPath: selectedProjectPath)
+        projects = projectCatalogService.mergedProjects(snapshot.projects, selectedProjectID: selectedProjectID)
         runHistory = snapshot.runHistory
-        projectDraftsByPath = snapshot.projectDraftsByPath
+        projectDraftsByProjectID = snapshot.projectDraftsByProjectID
     }
 
     var scale: CGFloat {
         CGFloat(Self.sanitizedScale(appUIScale))
     }
 
-    var lastSelectedProjectPath: String {
-        persistedProjectPath
+    var lastSelectedProjectID: String {
+        persistedProjectID
     }
 
-    func setLastSelectedProjectPath(_ path: String) {
-        persistedProjectPath = projectCatalogService.normalize(path)
-        persistenceStore.save(selectedProjectPath: persistedProjectPath)
+    func setLastSelectedProjectID(_ id: String) {
+        persistedProjectID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        persistenceStore.save(selectedProjectID: persistedProjectID)
     }
 
-    func addProject(_ path: String) {
-        projects = projectCatalogService.addProject(path: path, to: projects)
+    func addLocalProject(_ path: String) {
+        projects = projectCatalogService.addLocalProject(path: path, to: projects)
     }
 
-    func recordRunHistory(projectPath: String, code: String, executedAt: Date = Date()) {
-        runHistory = runHistoryService.record(projectPath: projectPath, code: code, executedAt: executedAt, in: runHistory)
+    func upsertProject(_ project: WorkspaceProject) {
+        projects = projectCatalogService.upsertProject(project, in: projects)
     }
 
-    func runHistory(for projectPath: String) -> [ProjectRunHistoryItem] {
-        runHistoryService.history(for: projectPath, in: runHistory)
+    func recordRunHistory(projectID: String, code: String, executedAt: Date = Date()) {
+        runHistory = runHistoryService.record(projectID: projectID, code: code, executedAt: executedAt, in: runHistory)
     }
 
-    func editorDraft(for projectPath: String) -> String? {
-        draftService.draft(for: projectPath, draftsByPath: projectDraftsByPath)
+    func runHistory(for projectID: String) -> [ProjectRunHistoryItem] {
+        runHistoryService.history(for: projectID, in: runHistory)
     }
 
-    func setEditorDraft(_ code: String, for projectPath: String) {
-        projectDraftsByPath = draftService.settingDraft(code, for: projectPath, draftsByPath: projectDraftsByPath)
+    func editorDraft(for projectID: String) -> String? {
+        draftService.draft(for: projectID, draftsByProjectID: projectDraftsByProjectID)
+    }
+
+    func setEditorDraft(_ code: String, for projectID: String) {
+        projectDraftsByProjectID = draftService.settingDraft(code, for: projectID, draftsByProjectID: projectDraftsByProjectID)
     }
 
     private func persistSettings() {
@@ -440,12 +437,14 @@ return $users->toJson();
     let appModel: AppModel
     private let executionProvider: any CodeExecutionProviding
     private let defaultProjectInstaller: any DefaultProjectInstalling
-    private let defaultProject = LaravelProject(path: WorkspaceState.defaultProjectPath)
+    private let dockerEnvironmentService: DockerEnvironmentService
+    private let defaultProject = WorkspaceProject.local(path: WorkspaceState.defaultProjectPath)
     private var historyWindowController: NSWindowController?
     private var historyWindowCloseObserver: NSObjectProtocol?
 
     var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
     var isPickingProjectFolder = false
+    var isShowingDockerProjectSheet = false
     var isRunning = false
     var isShowingDefaultProjectInstallSheet = false
     var isInstallingDefaultProject = false
@@ -459,16 +458,16 @@ return $users->toJson();
     var code = defaultCode {
         didSet {
             guard !isRestoringProjectDraft else { return }
-            appModel.setEditorDraft(code, for: laravelProjectPath)
+            appModel.setEditorDraft(code, for: selectedProjectID)
         }
     }
     var resultMessage = "Press Run to execute code."
     var latestExecution: PHPExecutionResult?
     var selectedRunHistoryItemID: String?
-    var laravelProjectPath: String {
+    var selectedProjectID: String {
         didSet {
-            appModel.setLastSelectedProjectPath(laravelProjectPath)
-            if laravelProjectPath != oldValue {
+            appModel.setLastSelectedProjectID(selectedProjectID)
+            if selectedProjectID != oldValue {
                 appModel.setEditorDraft(code, for: oldValue)
                 evaluateDefaultProjectSelection(showPromptIfMissing: true)
                 selectedRunHistoryItemID = nil
@@ -481,20 +480,22 @@ return $users->toJson();
     init(
         appModel: AppModel,
         executionProvider: any CodeExecutionProviding = PHPExecutionRunner(),
-        defaultProjectInstaller: any DefaultProjectInstalling = LaravelProjectInstaller()
+        defaultProjectInstaller: any DefaultProjectInstalling = LaravelProjectInstaller(),
+        dockerEnvironmentService: DockerEnvironmentService = .shared
     ) {
         self.appModel = appModel
         self.executionProvider = executionProvider
         self.defaultProjectInstaller = defaultProjectInstaller
-        let savedPath = appModel.lastSelectedProjectPath
-        if savedPath.isEmpty {
-            laravelProjectPath = defaultProject.path
-            appModel.setLastSelectedProjectPath(defaultProject.path)
+        self.dockerEnvironmentService = dockerEnvironmentService
+        let savedProjectID = appModel.lastSelectedProjectID
+        if savedProjectID.isEmpty || !([defaultProject] + appModel.projects).contains(where: { $0.id == savedProjectID }) {
+            selectedProjectID = defaultProject.id
+            appModel.setLastSelectedProjectID(defaultProject.id)
         } else {
-            laravelProjectPath = savedPath
+            selectedProjectID = savedProjectID
         }
         loadCodeDraftForCurrentProject()
-        evaluateDefaultProjectSelection(showPromptIfMissing: laravelProjectPath == defaultProject.path)
+        evaluateDefaultProjectSelection(showPromptIfMissing: selectedProjectID == defaultProject.id)
     }
 
     deinit {
@@ -543,20 +544,44 @@ return $users->toJson();
         set { appModel.lspServerPathOverride = newValue }
     }
 
-    var projects: [LaravelProject] {
-        [defaultProject] + appModel.projects.filter { $0.path != defaultProject.path }
+    var projects: [WorkspaceProject] {
+        [defaultProject] + appModel.projects.filter { $0.id != defaultProject.id }
+    }
+
+    var selectedProject: WorkspaceProject? {
+        projects.first(where: { $0.id == selectedProjectID })
+    }
+
+    var selectedProjectPath: String {
+        selectedProject?.path ?? ""
+    }
+
+    var selectedProjectSubtitle: String {
+        selectedProject?.subtitle ?? "No project selected"
+    }
+
+    var isLSPAvailableForSelectedProject: Bool {
+        selectedProject?.isLocal == true
+    }
+
+    var completionProjectPath: String {
+        selectedProjectPath
+    }
+
+    var effectiveLSPCompletionEnabled: Bool {
+        lspCompletionEnabled && isLSPAvailableForSelectedProject
     }
 
     var selectedProjectName: String {
-        guard !laravelProjectPath.isEmpty else { return "No project selected" }
-        if let project = projects.first(where: { $0.path == laravelProjectPath }) {
+        guard !selectedProjectID.isEmpty else { return "No project selected" }
+        if let project = selectedProject {
             return project.name
         }
-        return URL(fileURLWithPath: laravelProjectPath).lastPathComponent
+        return "No project selected"
     }
 
     var selectedProjectRunHistory: [ProjectRunHistoryItem] {
-        appModel.runHistory(for: laravelProjectPath)
+        appModel.runHistory(for: selectedProjectID)
     }
 
     var selectedRunHistoryItem: ProjectRunHistoryItem? {
@@ -668,13 +693,14 @@ return $users->toJson();
     }
 
     var canRevealSelectedProjectInFinder: Bool {
-        guard !laravelProjectPath.isEmpty else { return false }
+        guard let selectedProject else { return false }
+        guard case let .local(path) = selectedProject.connection else { return false }
         var isDirectory: ObjCBool = false
-        return FileManager.default.fileExists(atPath: laravelProjectPath, isDirectory: &isDirectory) && isDirectory.boolValue
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 
     var canShowRunHistory: Bool {
-        !laravelProjectPath.isEmpty
+        !selectedProjectID.isEmpty
     }
 
     func toggleRunStop() {
@@ -714,12 +740,30 @@ return $users->toJson();
         }
     }
 
-    func addProject(_ path: String) {
-        appModel.addProject(path)
-        let normalizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
-        if appModel.projects.contains(where: { $0.path == normalizedPath }) {
-            laravelProjectPath = normalizedPath
+    func addLocalProject(_ path: String) {
+        appModel.addLocalProject(path)
+        let selected = WorkspaceProject.local(path: path)
+        if appModel.projects.contains(where: { $0.id == selected.id }) {
+            selectedProjectID = selected.id
         }
+    }
+
+    func addDockerProject(container: DockerContainerSummary, projectPath: String) {
+        let project = WorkspaceProject.docker(
+            containerID: container.id,
+            containerName: container.name,
+            projectPath: projectPath
+        )
+        appModel.upsertProject(project)
+        selectedProjectID = project.id
+    }
+
+    func listDockerContainers() async -> [DockerContainerSummary] {
+        await dockerEnvironmentService.listRunningContainers()
+    }
+
+    func detectDockerProjectPaths(containerID: String) async -> [String] {
+        await dockerEnvironmentService.detectProjectPaths(containerID: containerID)
     }
 
     func copyVisibleResultToPasteboard() {
@@ -733,8 +777,9 @@ return $users->toJson();
 
     func revealSelectedProjectInFinder() {
         guard canRevealSelectedProjectInFinder else { return }
+        guard let selectedProject, case let .local(path) = selectedProject.connection else { return }
         #if os(macOS)
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: laravelProjectPath)])
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
         #endif
     }
 
@@ -796,13 +841,13 @@ return $users->toJson();
     }
 
     private func executeRunCode() async {
-        guard !laravelProjectPath.isEmpty else {
+        guard let selectedProject else {
             latestExecution = nil
-            resultMessage = "Select a Laravel project folder first (toolbar: plus.folder)."
+            resultMessage = "Select a project first."
             return
         }
 
-        if laravelProjectPath == defaultProject.path && !isLaravelProjectAvailable(at: defaultProject.path) {
+        if selectedProject.id == defaultProject.id && !isLaravelProjectAvailable(at: defaultProject.path) {
             latestExecution = nil
             resultMessage = "Install the Default Laravel project first."
             isShowingDefaultProjectInstallSheet = true
@@ -817,9 +862,9 @@ return $users->toJson();
 
         while true {
             resultMessage = "Running script..."
-            appModel.recordRunHistory(projectPath: laravelProjectPath, code: code)
+            appModel.recordRunHistory(projectID: selectedProjectID, code: code)
 
-            let execution = await executionProvider.run(code: code, projectPath: laravelProjectPath)
+            let execution = await executionProvider.run(code: code, context: ExecutionContext(project: selectedProject))
             latestExecution = execution
 
             if execution.wasStopped {
@@ -861,7 +906,7 @@ return $users->toJson();
     }
 
     private func loadCodeDraftForCurrentProject() {
-        let draft = appModel.editorDraft(for: laravelProjectPath) ?? Self.defaultCode
+        let draft = appModel.editorDraft(for: selectedProjectID) ?? Self.defaultCode
         isRestoringProjectDraft = true
         code = draft
         isRestoringProjectDraft = false
@@ -899,7 +944,7 @@ return $users->toJson();
     }
 
     private func evaluateDefaultProjectSelection(showPromptIfMissing: Bool) {
-        guard laravelProjectPath == defaultProject.path else {
+        guard selectedProjectID == defaultProject.id else {
             if !isInstallingDefaultProject {
                 isShowingDefaultProjectInstallSheet = false
             }

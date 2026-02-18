@@ -1,5 +1,172 @@
 import Foundation
 
+enum ProjectConnectionKind: String, Codable, Sendable {
+    case local
+    case docker
+    case ssh
+}
+
+struct DockerProjectConfig: Codable, Hashable, Sendable {
+    var containerID: String
+    var containerName: String
+    var projectPath: String
+}
+
+struct SSHProjectConfig: Codable, Hashable, Sendable {
+    var host: String
+    var projectPath: String
+}
+
+enum ProjectConnection: Codable, Hashable, Sendable {
+    case local(path: String)
+    case docker(DockerProjectConfig)
+    case ssh(SSHProjectConfig)
+
+    private enum CodingKeys: String, CodingKey {
+        case kind
+        case path
+        case docker
+        case ssh
+    }
+
+    var kind: ProjectConnectionKind {
+        switch self {
+        case .local:
+            return .local
+        case .docker:
+            return .docker
+        case .ssh:
+            return .ssh
+        }
+    }
+
+    var projectPath: String {
+        switch self {
+        case let .local(path):
+            return path
+        case let .docker(config):
+            return config.projectPath
+        case let .ssh(config):
+            return config.projectPath
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try container.decode(ProjectConnectionKind.self, forKey: .kind)
+        switch kind {
+        case .local:
+            let path = try container.decode(String.self, forKey: .path)
+            self = .local(path: path)
+        case .docker:
+            let config = try container.decode(DockerProjectConfig.self, forKey: .docker)
+            self = .docker(config)
+        case .ssh:
+            let config = try container.decode(SSHProjectConfig.self, forKey: .ssh)
+            self = .ssh(config)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case let .local(path):
+            try container.encode(ProjectConnectionKind.local, forKey: .kind)
+            try container.encode(path, forKey: .path)
+        case let .docker(config):
+            try container.encode(ProjectConnectionKind.docker, forKey: .kind)
+            try container.encode(config, forKey: .docker)
+        case let .ssh(config):
+            try container.encode(ProjectConnectionKind.ssh, forKey: .kind)
+            try container.encode(config, forKey: .ssh)
+        }
+    }
+}
+
+struct WorkspaceProject: Codable, Hashable, Identifiable, Sendable {
+    let id: String
+    var name: String
+    var languageID: String
+    var connection: ProjectConnection
+
+    var path: String { connection.projectPath }
+
+    var subtitle: String {
+        switch connection {
+        case let .local(path):
+            return path
+        case let .docker(config):
+            return "\(config.containerName):\(config.projectPath)"
+        case let .ssh(config):
+            return "\(config.host):\(config.projectPath)"
+        }
+    }
+
+    var isLocal: Bool {
+        if case .local = connection { return true }
+        return false
+    }
+
+    static func local(path: String, languageID: String = "php") -> WorkspaceProject {
+        let normalized = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL.path
+        return WorkspaceProject(
+            id: "local:\(normalized)",
+            name: URL(fileURLWithPath: normalized).lastPathComponent,
+            languageID: languageID,
+            connection: .local(path: normalized)
+        )
+    }
+
+    static func docker(
+        containerID: String,
+        containerName: String,
+        projectPath: String,
+        languageID: String = "php"
+    ) -> WorkspaceProject {
+        let normalizedPath = WorkspaceProject.normalizePOSIXPath(projectPath)
+        let displayPath = URL(fileURLWithPath: normalizedPath).lastPathComponent
+        return WorkspaceProject(
+            id: "docker:\(containerID):\(normalizedPath)",
+            name: "\(containerName) · \(displayPath)",
+            languageID: languageID,
+            connection: .docker(
+                DockerProjectConfig(
+                    containerID: containerID,
+                    containerName: containerName,
+                    projectPath: normalizedPath
+                )
+            )
+        )
+    }
+
+    private static func normalizePOSIXPath(_ raw: String) -> String {
+        var normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized.isEmpty {
+            return "/"
+        }
+        if !normalized.hasPrefix("/") {
+            normalized = "/\(normalized)"
+        }
+        while normalized.count > 1 && normalized.hasSuffix("/") {
+            normalized.removeLast()
+        }
+        return normalized
+    }
+}
+
+typealias LaravelProject = WorkspaceProject
+
+struct DockerContainerSummary: Codable, Hashable, Identifiable, Sendable {
+    let id: String
+    let name: String
+    let image: String
+    let status: String
+}
+
+struct ExecutionContext: Sendable {
+    let project: WorkspaceProject
+}
+
 struct AppSettings: Sendable {
     var appUIScale: Double
     var showLineNumbers: Bool
@@ -13,24 +180,24 @@ struct AppSettings: Sendable {
 
 struct WorkspacePersistenceSnapshot: Sendable {
     var settings: AppSettings
-    var selectedProjectPath: String
-    var projects: [LaravelProject]
+    var selectedProjectID: String
+    var projects: [WorkspaceProject]
     var runHistory: [ProjectRunHistoryItem]
-    var projectDraftsByPath: [String: String]
+    var projectDraftsByProjectID: [String: String]
 }
 
 @MainActor
 protocol WorkspacePersistenceStore {
     func load() -> WorkspacePersistenceSnapshot
     func save(settings: AppSettings)
-    func save(projects: [LaravelProject])
+    func save(projects: [WorkspaceProject])
     func save(runHistory: [ProjectRunHistoryItem])
-    func save(projectDraftsByPath: [String: String])
-    func save(selectedProjectPath: String)
+    func save(projectDraftsByProjectID: [String: String])
+    func save(selectedProjectID: String)
 }
 
 protocol CodeExecutionProviding: Sendable {
-    func run(code: String, projectPath: String) async -> PHPExecutionResult
+    func run(code: String, context: ExecutionContext) async -> PHPExecutionResult
     func stop() async
 }
 

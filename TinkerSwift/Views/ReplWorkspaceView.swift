@@ -1,9 +1,12 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ReplWorkspaceView: View {
     @Environment(WorkspaceState.self) private var workspaceState
 
     var body: some View {
+        @Bindable var workspaceState = workspaceState
+
         HSplitView {
             EditorPaneView()
                 .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
@@ -22,9 +25,9 @@ struct ReplWorkspaceView: View {
                     } else {
                         ForEach(workspaceState.projects) { project in
                             Button {
-                                workspaceState.laravelProjectPath = project.path
+                                workspaceState.selectedProjectID = project.id
                             } label: {
-                                Label(project.name, systemImage: workspaceState.laravelProjectPath == project.path ? "checkmark" : "folder")
+                                Label(project.name, systemImage: workspaceState.selectedProjectID == project.id ? "checkmark" : (project.connection.kind == .docker ? "shippingbox.fill" : "folder"))
                             }
                         }
                     }
@@ -34,7 +37,13 @@ struct ReplWorkspaceView: View {
                     Button {
                         workspaceState.isPickingProjectFolder = true
                     } label: {
-                        Label("Add Project", systemImage: "folder.badge.plus")
+                        Label("Add Local Project", systemImage: "folder.badge.plus")
+                    }
+
+                    Button {
+                        workspaceState.isShowingDockerProjectSheet = true
+                    } label: {
+                        Label("Add Docker Project", systemImage: "shippingbox")
                     }
                 } label: {
                     Image(systemName: "folder")
@@ -63,6 +72,18 @@ struct ReplWorkspaceView: View {
             }
         }
         .navigationTitle(workspaceState.selectedProjectName)
-        .navigationSubtitle(workspaceState.laravelProjectPath.isEmpty ? "No project selected" : workspaceState.laravelProjectPath)
+        .navigationSubtitle(workspaceState.selectedProjectSubtitle)
+        .fileImporter(
+            isPresented: $workspaceState.isPickingProjectFolder,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case let .success(urls) = result, let url = urls.first else { return }
+            workspaceState.addLocalProject(url.path)
+        }
+        .sheet(isPresented: $workspaceState.isShowingDockerProjectSheet) {
+            DockerProjectSetupSheet()
+                .environment(workspaceState)
+        }
     }
 }

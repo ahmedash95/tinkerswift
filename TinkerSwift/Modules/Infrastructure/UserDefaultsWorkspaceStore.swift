@@ -11,11 +11,27 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
         static let lspCompletionEnabled = "editor.lspCompletionEnabled"
         static let lspAutoTriggerEnabled = "editor.lspAutoTriggerEnabled"
         static let lspServerPathOverride = "editor.lspServerPathOverride"
-        static let laravelProjectPath = "laravel.projectPath"
-        static let laravelProjectsJSON = "laravel.projectsJSON"
-        static let runHistoryJSON = "laravel.runHistoryJSON"
-        static let projectDraftsJSON = "editor.projectDraftsJSON"
+        static let selectedProjectID = "workspace.selectedProjectID"
+        static let projectsV2JSON = "workspace.projectsV2JSON"
+        static let runHistoryV2JSON = "workspace.runHistoryV2JSON"
+        static let projectDraftsByProjectIDJSON = "editor.projectDraftsByProjectIDJSON"
+
+        static let legacySelectedProjectPath = "laravel.projectPath"
+        static let legacyProjectsJSON = "laravel.projectsJSON"
+        static let legacyRunHistoryJSON = "laravel.runHistoryJSON"
+        static let legacyProjectDraftsJSON = "editor.projectDraftsJSON"
         static let legacyEditorFontSize = "editor.fontSize"
+    }
+
+    private struct LegacyProject: Codable {
+        let path: String
+    }
+
+    private struct LegacyRunHistoryItem: Codable {
+        let id: String
+        let projectPath: String
+        let code: String
+        let executedAt: Date
     }
 
     private static let minScale = 0.6
@@ -48,17 +64,62 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
             lspServerPathOverride: defaults.string(forKey: DefaultsKey.lspServerPathOverride) ?? ""
         )
 
-        let selectedProjectPath = normalizeProjectPath(defaults.string(forKey: DefaultsKey.laravelProjectPath) ?? "")
-        let projects = decodeProjects(from: defaults.string(forKey: DefaultsKey.laravelProjectsJSON) ?? "[]")
-        let runHistory = decodeRunHistory(from: defaults.string(forKey: DefaultsKey.runHistoryJSON) ?? "[]")
-        let projectDraftsByPath = decodeProjectDrafts(from: defaults.string(forKey: DefaultsKey.projectDraftsJSON) ?? "{}")
+        var projects = decodeProjectsV2(from: defaults.string(forKey: DefaultsKey.projectsV2JSON) ?? "[]")
+        if projects.isEmpty {
+            projects = decodeLegacyProjects(from: defaults.string(forKey: DefaultsKey.legacyProjectsJSON) ?? "[]")
+            if !projects.isEmpty {
+                save(projects: projects)
+            }
+        }
+
+        var selectedProjectID = defaults.string(forKey: DefaultsKey.selectedProjectID) ?? ""
+        if selectedProjectID.isEmpty {
+            let legacyPath = defaults.string(forKey: DefaultsKey.legacySelectedProjectPath) ?? ""
+            let normalizedLegacyPath = normalizeProjectPath(legacyPath)
+            if !normalizedLegacyPath.isEmpty {
+                selectedProjectID = WorkspaceProject.local(path: normalizedLegacyPath).id
+            }
+        }
+
+        if selectedProjectID.isEmpty {
+            selectedProjectID = projects.first?.id ?? ""
+        }
+
+        let localPathToID = localProjectPathToIDMap(projects: projects)
+        var runHistory = decodeRunHistoryV2(from: defaults.string(forKey: DefaultsKey.runHistoryV2JSON) ?? "[]")
+        if runHistory.isEmpty {
+            runHistory = decodeLegacyRunHistory(
+                from: defaults.string(forKey: DefaultsKey.legacyRunHistoryJSON) ?? "[]",
+                localPathToID: localPathToID
+            )
+            if !runHistory.isEmpty {
+                save(runHistory: runHistory)
+            }
+        }
+
+        var projectDraftsByProjectID = decodeProjectDraftsByProjectID(
+            from: defaults.string(forKey: DefaultsKey.projectDraftsByProjectIDJSON) ?? "{}"
+        )
+        if projectDraftsByProjectID.isEmpty {
+            projectDraftsByProjectID = decodeLegacyProjectDrafts(
+                from: defaults.string(forKey: DefaultsKey.legacyProjectDraftsJSON) ?? "{}",
+                localPathToID: localPathToID
+            )
+            if !projectDraftsByProjectID.isEmpty {
+                save(projectDraftsByProjectID: projectDraftsByProjectID)
+            }
+        }
+
+        if !selectedProjectID.isEmpty {
+            defaults.set(selectedProjectID, forKey: DefaultsKey.selectedProjectID)
+        }
 
         return WorkspacePersistenceSnapshot(
             settings: settings,
-            selectedProjectPath: selectedProjectPath,
+            selectedProjectID: selectedProjectID,
             projects: projects,
             runHistory: runHistory,
-            projectDraftsByPath: projectDraftsByPath
+            projectDraftsByProjectID: projectDraftsByProjectID
         )
     }
 
@@ -73,14 +134,15 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
         defaults.set(settings.lspServerPathOverride, forKey: DefaultsKey.lspServerPathOverride)
     }
 
-    func save(projects: [LaravelProject]) {
+    func save(projects: [WorkspaceProject]) {
         let encoder = JSONEncoder()
-        guard let data = try? encoder.encode(projects),
+        let sanitized = projects.compactMap(sanitizeProject)
+        guard let data = try? encoder.encode(sanitized),
               let json = String(data: data, encoding: .utf8)
         else {
             return
         }
-        defaults.set(json, forKey: DefaultsKey.laravelProjectsJSON)
+        defaults.set(json, forKey: DefaultsKey.projectsV2JSON)
     }
 
     func save(runHistory: [ProjectRunHistoryItem]) {
@@ -91,26 +153,41 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
         else {
             return
         }
-        defaults.set(json, forKey: DefaultsKey.runHistoryJSON)
+        defaults.set(json, forKey: DefaultsKey.runHistoryV2JSON)
     }
 
-    func save(projectDraftsByPath: [String: String]) {
+    func save(projectDraftsByProjectID: [String: String]) {
         let encoder = JSONEncoder()
-        guard let data = try? encoder.encode(projectDraftsByPath),
+        guard let data = try? encoder.encode(projectDraftsByProjectID),
               let json = String(data: data, encoding: .utf8)
         else {
             return
         }
-        defaults.set(json, forKey: DefaultsKey.projectDraftsJSON)
+        defaults.set(json, forKey: DefaultsKey.projectDraftsByProjectIDJSON)
     }
 
-    func save(selectedProjectPath: String) {
-        defaults.set(normalizeProjectPath(selectedProjectPath), forKey: DefaultsKey.laravelProjectPath)
+    func save(selectedProjectID: String) {
+        defaults.set(selectedProjectID, forKey: DefaultsKey.selectedProjectID)
     }
 
-    private func decodeProjects(from json: String) -> [LaravelProject] {
+    private func decodeProjectsV2(from json: String) -> [WorkspaceProject] {
         guard let data = json.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([LaravelProject].self, from: data)
+              let decoded = try? JSONDecoder().decode([WorkspaceProject].self, from: data)
+        else {
+            return []
+        }
+
+        var seen = Set<String>()
+        return decoded.compactMap { original in
+            guard let sanitized = sanitizeProject(original) else { return nil }
+            guard seen.insert(sanitized.id).inserted else { return nil }
+            return sanitized
+        }
+    }
+
+    private func decodeLegacyProjects(from json: String) -> [WorkspaceProject] {
+        guard let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([LegacyProject].self, from: data)
         else {
             return []
         }
@@ -119,12 +196,13 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
         return decoded.compactMap { project in
             let normalizedPath = normalizeProjectPath(project.path)
             guard !normalizedPath.isEmpty else { return nil }
-            guard seen.insert(normalizedPath).inserted else { return nil }
-            return LaravelProject(path: normalizedPath)
+            let item = WorkspaceProject.local(path: normalizedPath)
+            guard seen.insert(item.id).inserted else { return nil }
+            return item
         }
     }
 
-    private func decodeRunHistory(from json: String) -> [ProjectRunHistoryItem] {
+    private func decodeRunHistoryV2(from json: String) -> [ProjectRunHistoryItem] {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let data = json.data(using: .utf8),
@@ -133,36 +211,134 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
             return []
         }
 
+        return decoded.filter { !$0.projectID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+
+    private func decodeLegacyRunHistory(from json: String, localPathToID: [String: String]) -> [ProjectRunHistoryItem] {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let data = json.data(using: .utf8),
+              let decoded = try? decoder.decode([LegacyRunHistoryItem].self, from: data)
+        else {
+            return []
+        }
+
         return decoded.compactMap { item in
             let normalizedPath = normalizeProjectPath(item.projectPath)
-            guard !normalizedPath.isEmpty else { return nil }
+            guard let projectID = localPathToID[normalizedPath] else { return nil }
             return ProjectRunHistoryItem(
                 id: item.id,
-                projectPath: normalizedPath,
+                projectID: projectID,
                 code: item.code,
                 executedAt: item.executedAt
             )
         }
     }
 
-    private func decodeProjectDrafts(from json: String) -> [String: String] {
+    private func decodeProjectDraftsByProjectID(from json: String) -> [String: String] {
         guard let data = json.data(using: .utf8),
               let decoded = try? JSONDecoder().decode([String: String].self, from: data)
         else {
             return [:]
         }
 
-        var sanitized: [String: String] = [:]
+        return decoded.filter { key, _ in
+            !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
+    private func decodeLegacyProjectDrafts(from json: String, localPathToID: [String: String]) -> [String: String] {
+        guard let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String: String].self, from: data)
+        else {
+            return [:]
+        }
+
+        var next: [String: String] = [:]
         for (path, draft) in decoded {
             let normalizedPath = normalizeProjectPath(path)
-            guard !normalizedPath.isEmpty else { continue }
-            sanitized[normalizedPath] = draft
+            guard let projectID = localPathToID[normalizedPath] else { continue }
+            next[projectID] = draft
         }
-        return sanitized
+        return next
+    }
+
+    private func localProjectPathToIDMap(projects: [WorkspaceProject]) -> [String: String] {
+        var mapping: [String: String] = [:]
+        for project in projects {
+            if case let .local(path) = project.connection {
+                mapping[normalizeProjectPath(path)] = project.id
+            }
+        }
+        return mapping
+    }
+
+    private func sanitizeProject(_ project: WorkspaceProject) -> WorkspaceProject? {
+        switch project.connection {
+        case let .local(path):
+            let normalizedPath = normalizeProjectPath(path)
+            guard !normalizedPath.isEmpty else { return nil }
+            let normalized = WorkspaceProject.local(path: normalizedPath, languageID: project.languageID)
+            if project.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return normalized
+            }
+            return WorkspaceProject(
+                id: normalized.id,
+                name: project.name,
+                languageID: project.languageID,
+                connection: normalized.connection
+            )
+        case let .docker(config):
+            let containerID = config.containerID.trimmingCharacters(in: .whitespacesAndNewlines)
+            let containerName = config.containerName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let projectPath = normalizeDockerPath(config.projectPath)
+            guard !containerID.isEmpty, !containerName.isEmpty, !projectPath.isEmpty else {
+                return nil
+            }
+            let normalized = WorkspaceProject.docker(
+                containerID: containerID,
+                containerName: containerName,
+                projectPath: projectPath,
+                languageID: project.languageID
+            )
+            if project.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return normalized
+            }
+            return WorkspaceProject(
+                id: normalized.id,
+                name: project.name,
+                languageID: project.languageID,
+                connection: normalized.connection
+            )
+        case let .ssh(config):
+            let host = config.host.trimmingCharacters(in: .whitespacesAndNewlines)
+            let projectPath = normalizeDockerPath(config.projectPath)
+            guard !host.isEmpty, !projectPath.isEmpty else { return nil }
+            return WorkspaceProject(
+                id: "ssh:\(host):\(projectPath)",
+                name: project.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "\(host) · \(URL(fileURLWithPath: projectPath).lastPathComponent)" : project.name,
+                languageID: project.languageID,
+                connection: .ssh(SSHProjectConfig(host: host, projectPath: projectPath))
+            )
+        }
     }
 
     private func normalizeProjectPath(_ raw: String) -> String {
         var normalized = URL(fileURLWithPath: raw).standardizedFileURL.path
+        while normalized.count > 1 && normalized.hasSuffix("/") {
+            normalized.removeLast()
+        }
+        return normalized
+    }
+
+    private func normalizeDockerPath(_ raw: String) -> String {
+        var normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized.isEmpty {
+            return ""
+        }
+        if !normalized.hasPrefix("/") {
+            normalized = "/\(normalized)"
+        }
         while normalized.count > 1 && normalized.hasSuffix("/") {
             normalized.removeLast()
         }

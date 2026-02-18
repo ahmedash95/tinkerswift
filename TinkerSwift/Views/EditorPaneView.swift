@@ -13,8 +13,8 @@ struct EditorPaneView: View {
             wrapLines: workspaceState.wrapLines,
             highlightSelectedLine: workspaceState.highlightSelectedLine,
             syntaxHighlighting: workspaceState.syntaxHighlighting,
-            projectPath: workspaceState.laravelProjectPath,
-            lspCompletionEnabled: workspaceState.lspCompletionEnabled,
+            projectPath: workspaceState.completionProjectPath,
+            lspCompletionEnabled: workspaceState.effectiveLSPCompletionEnabled,
             lspAutoTriggerEnabled: workspaceState.lspAutoTriggerEnabled,
             lspServerPathOverride: workspaceState.lspServerPathOverride
         )

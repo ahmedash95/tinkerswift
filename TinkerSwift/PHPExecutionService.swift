@@ -11,17 +11,162 @@ struct PHPExecutionResult {
     let wasStopped: Bool
 }
 
+actor DockerEnvironmentService {
+    static let shared = DockerEnvironmentService()
+
+    func listRunningContainers() async -> [DockerContainerSummary] {
+        let result = await runDockerCommand(arguments: [
+            "ps",
+            "--format",
+            "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}"
+        ])
+
+        guard result.exitCode == 0 else {
+            await DebugConsoleStore.shared.append(
+                stream: .app,
+                message: "[Docker] list containers failed: \(result.stderr.trimmingCharacters(in: .whitespacesAndNewlines))"
+            )
+            return []
+        }
+
+        let lines = result.stdout.split(whereSeparator: \.isNewline)
+        return lines.compactMap { line in
+            let parts = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+            guard parts.count >= 4 else { return nil }
+            let id = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            let name = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+            let image = parts[2].trimmingCharacters(in: .whitespacesAndNewlines)
+            let status = parts[3].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !id.isEmpty, !name.isEmpty else { return nil }
+            return DockerContainerSummary(id: id, name: name, image: image, status: status)
+        }
+        .sorted { lhs, rhs in
+            lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    func detectProjectPaths(containerID: String) async -> [String] {
+        let command = [
+            "exec",
+            containerID,
+            "sh",
+            "-lc",
+            #"""
+paths="$(pwd) /var/www/html /var/www /app /srv/app /workspace /usr/src/app /code"
+for d in $paths; do
+  if [ -f "$d/artisan" ]; then
+    echo "$d"
+  fi
+done
+for base in /var/www /app /workspace /srv /usr/src /code; do
+  if [ -d "$base" ]; then
+    find "$base" -maxdepth 4 -type f -name artisan 2>/dev/null | sed 's#/artisan$##'
+  fi
+done
+"""#
+        ]
+
+        let result = await runDockerCommand(arguments: command)
+        guard result.exitCode == 0 else {
+            return []
+        }
+
+        var seen = Set<String>()
+        var candidates: [String] = []
+        for line in result.stdout.split(whereSeparator: \.isNewline) {
+            var value = String(line).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { continue }
+            if !value.hasPrefix("/") {
+                value = "/\(value)"
+            }
+            while value.count > 1 && value.hasSuffix("/") {
+                value.removeLast()
+            }
+            guard seen.insert(value).inserted else { continue }
+            candidates.append(value)
+        }
+        return candidates
+    }
+
+    private func runDockerCommand(arguments: [String], stdinData: Data? = nil) async -> DockerCommandResult {
+        await withCheckedContinuation { continuation in
+            let process = Process()
+            let stdoutPipe = Pipe()
+            let stderrPipe = Pipe()
+            let stdinPipe = Pipe()
+
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = ["docker"] + arguments
+            process.standardOutput = stdoutPipe
+            process.standardError = stderrPipe
+            process.standardInput = stdinPipe
+
+            do {
+                try process.run()
+            } catch {
+                continuation.resume(returning: DockerCommandResult(stdout: "", stderr: error.localizedDescription, exitCode: 1))
+                return
+            }
+
+            if let stdinData {
+                stdinPipe.fileHandleForWriting.write(stdinData)
+            }
+            stdinPipe.fileHandleForWriting.closeFile()
+
+            process.terminationHandler = { process in
+                let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
+                let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+                continuation.resume(
+                    returning: DockerCommandResult(
+                        stdout: stdout,
+                        stderr: stderr,
+                        exitCode: process.terminationStatus
+                    )
+                )
+            }
+        }
+    }
+}
+
+private struct DockerCommandResult {
+    let stdout: String
+    let stderr: String
+    let exitCode: Int32
+}
+
 actor PHPExecutionRunner: CodeExecutionProviding {
     private struct RuntimeMetrics: Decodable {
         let durationMs: Double
         let peakMemoryBytes: UInt64
     }
 
+    private let dockerMetricsPrefix = "__TINKERSWIFT_METRICS__"
     private var activeProcess: Process?
     private var activeRunID: UUID?
     private var stopRequestedRunIDs = Set<UUID>()
 
-    func run(code: String, projectPath: String) async -> PHPExecutionResult {
+    func run(code: String, context: ExecutionContext) async -> PHPExecutionResult {
+        switch context.project.connection {
+        case let .local(path):
+            return await runLocal(code: code, projectPath: path)
+        case let .docker(config):
+            return await runDocker(code: code, config: config)
+        case .ssh:
+            return PHPExecutionResult(
+                command: "php <unavailable>",
+                stdout: "",
+                stderr: "SSH projects are not supported yet.",
+                exitCode: 1,
+                durationMs: nil,
+                peakMemoryBytes: nil,
+                wasStopped: false
+            )
+        }
+    }
+
+    private func runLocal(code: String, projectPath: String) async -> PHPExecutionResult {
         let projectURL = URL(fileURLWithPath: projectPath)
         let artisanURL = projectURL.appendingPathComponent("artisan")
 
@@ -182,6 +327,133 @@ try {
         }
     }
 
+    private func runDocker(code: String, config: DockerProjectConfig) async -> PHPExecutionResult {
+        let body = Self.normalizedSnippetBody(code)
+        let encodedBody = Data(body.utf8).base64EncodedString()
+        let script = """
+<?php
+declare(strict_types=1);
+
+use Illuminate\\Contracts\\Console\\Kernel;
+
+if (!file_exists('artisan')) {
+    fwrite(STDERR, "No artisan file found in working directory: " . getcwd() . PHP_EOL);
+    exit(127);
+}
+
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(Kernel::class)->bootstrap();
+
+$__start = microtime(true);
+$__code = base64_decode('\(encodedBody)');
+if ($__code === false) {
+    fwrite(STDERR, "Failed to decode snippet" . PHP_EOL);
+    exit(1);
+}
+
+ob_start();
+try {
+    $__result = eval($__code);
+    $__stdout = ob_get_clean();
+    if ($__stdout !== '') {
+        fwrite(STDOUT, $__stdout);
+    }
+
+    if ($__result !== null) {
+        if (is_scalar($__result)) {
+            fwrite(STDOUT, (string) $__result . PHP_EOL);
+        } else {
+            ob_start();
+            var_dump($__result);
+            fwrite(STDOUT, ob_get_clean());
+        }
+    }
+    $__durationMs = (microtime(true) - $__start) * 1000.0;
+    $__peakMemoryBytes = memory_get_peak_usage(true);
+    fwrite(STDERR, "\(dockerMetricsPrefix)" . json_encode(['durationMs' => $__durationMs, 'peakMemoryBytes' => $__peakMemoryBytes]) . PHP_EOL);
+    exit(0);
+} catch (Throwable $e) {
+    $__stdout = ob_get_clean();
+    if ($__stdout !== '') {
+        fwrite(STDOUT, $__stdout);
+    }
+    fwrite(STDERR, (string) $e . PHP_EOL);
+    $__durationMs = (microtime(true) - $__start) * 1000.0;
+    $__peakMemoryBytes = memory_get_peak_usage(true);
+    fwrite(STDERR, "\(dockerMetricsPrefix)" . json_encode(['durationMs' => $__durationMs, 'peakMemoryBytes' => $__peakMemoryBytes]) . PHP_EOL);
+    exit(1);
+}
+"""
+
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        let stdinPipe = Pipe()
+
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = [
+            "docker",
+            "exec",
+            "-i",
+            "-w",
+            config.projectPath,
+            config.containerID,
+            "php",
+            "-d",
+            "display_errors=1",
+            "-d",
+            "html_errors=0",
+            "-d",
+            "error_reporting=E_ALL"
+        ]
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+        process.standardInput = stdinPipe
+
+        let runID = UUID()
+        let startedAt = Date()
+
+        do {
+            beginActiveExecution(process: process, runID: runID)
+            try process.run()
+            stdinPipe.fileHandleForWriting.write(Data(script.utf8))
+            stdinPipe.fileHandleForWriting.closeFile()
+            try await waitForTermination(process)
+
+            let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+            let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
+            let rawStderr = String(data: stderrData, encoding: .utf8) ?? ""
+            let parsed = parseDockerRuntimeMetrics(from: rawStderr)
+
+            let stoppedByRequest = endActiveExecution(runID)
+            let stoppedBySignal = process.terminationReason == .uncaughtSignal &&
+                (process.terminationStatus == SIGTERM || process.terminationStatus == SIGINT)
+
+            return PHPExecutionResult(
+                command: "docker exec -i -w \(config.projectPath) \(config.containerID) php",
+                stdout: stdout,
+                stderr: parsed.stderr,
+                exitCode: process.terminationStatus,
+                durationMs: parsed.metrics?.durationMs ?? Date().timeIntervalSince(startedAt) * 1000.0,
+                peakMemoryBytes: parsed.metrics?.peakMemoryBytes,
+                wasStopped: stoppedByRequest || stoppedBySignal
+            )
+        } catch {
+            _ = endActiveExecution(runID)
+            return PHPExecutionResult(
+                command: "docker exec -i -w \(config.projectPath) \(config.containerID) php",
+                stdout: "",
+                stderr: "Failed to run Docker PHP process: \(error.localizedDescription)",
+                exitCode: 1,
+                durationMs: nil,
+                peakMemoryBytes: nil,
+                wasStopped: false
+            )
+        }
+    }
+
     func stop() async {
         if let runID = activeRunID {
             stopRequestedRunIDs.insert(runID)
@@ -202,7 +474,32 @@ try {
         }
     }
 
+    private func parseDockerRuntimeMetrics(from stderr: String) -> (stderr: String, metrics: RuntimeMetrics?) {
+        var cleanedLines: [String] = []
+        var metrics: RuntimeMetrics?
+        for line in stderr.split(whereSeparator: \.isNewline) {
+            let text = String(line)
+            if text.hasPrefix(dockerMetricsPrefix) {
+                let payload = String(text.dropFirst(dockerMetricsPrefix.count))
+                if let data = payload.data(using: .utf8),
+                   let decoded = try? JSONDecoder().decode(RuntimeMetrics.self, from: data)
+                {
+                    metrics = decoded
+                }
+                continue
+            }
+            cleanedLines.append(text)
+        }
+        let cleaned = cleanedLines.joined(separator: "\n")
+        return (stderr: cleaned, metrics: metrics)
+    }
+
     private static func normalizedSnippet(_ rawCode: String) -> String {
+        let body = normalizedSnippetBody(rawCode)
+        return "<?php\n\(body)\n"
+    }
+
+    private static func normalizedSnippetBody(_ rawCode: String) -> String {
         var code = rawCode.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let openTagRange = code.range(of: #"^\s*<\?(?:php|=)?"#, options: .regularExpression) {
@@ -212,8 +509,7 @@ try {
             code.removeSubrange(closeTagRange)
         }
 
-        let body = code.trimmingCharacters(in: .whitespacesAndNewlines)
-        return "<?php\n\(body)\n"
+        return code.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func readRuntimeMetrics(from url: URL) -> RuntimeMetrics? {
@@ -238,6 +534,17 @@ try {
             } catch {
                 process.terminationHandler = nil
                 continuation.resume(throwing: error)
+            }
+        }
+    }
+
+    private func waitForTermination(_ process: Process) async throws {
+        if !process.isRunning {
+            return
+        }
+        try await withCheckedThrowingContinuation { continuation in
+            process.terminationHandler = { _ in
+                continuation.resume()
             }
         }
     }
