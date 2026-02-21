@@ -3,6 +3,10 @@ import AppKit
 import STPluginNeon
 import STTextView
 import SwiftUI
+import Neon
+import TreeSitterClient
+import SwiftTreeSitter
+import TreeSitterResource
 
 struct AppKitCodeEditor: NSViewRepresentable {
     @Binding var text: String
@@ -143,7 +147,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         var isSyncing = false
         private var lastAppliedFontSize: CGFloat = 0
         private weak var textView: CodePaneTextView?
-        private var neonPlugin: NeonPlugin?
+        private var neonPlugin: TinkerNeonPlugin?
         private var lastSyntaxHighlightingEnabled: Bool?
         private var lastVisualStateSignature: String?
 
@@ -176,7 +180,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         func installPluginsIfNeeded(on textView: STTextView) {
             guard neonPlugin == nil else { return }
             let colorOnlyTheme = Theme(colors: Theme.default.colors, fonts: Theme.Fonts(fonts: [:]))
-            let plugin = NeonPlugin(theme: colorOnlyTheme, language: .php)
+            let plugin = TinkerNeonPlugin(theme: colorOnlyTheme, language: .php)
             textView.addPlugin(plugin)
             neonPlugin = plugin
         }
@@ -599,6 +603,322 @@ fileprivate final class CodePaneTextView: STTextView {
         DispatchQueue.main.async { [weak self] in
             self?.onVisualStateChange?()
         }
+    }
+}
+
+@MainActor
+private final class TinkerNeonPlugin: STPlugin {
+    private let theme: Theme
+    private let language: TreeSitterLanguage
+    private weak var coordinatorReference: TinkerNeonCoordinator?
+
+    init(theme: Theme = .default, language: TreeSitterLanguage) {
+        self.theme = theme
+        self.language = language
+    }
+
+    func setUp(context: any Context) {
+        context.events.onWillChangeText { affectedRange, _ in
+            let range = NSRange(affectedRange, in: context.textView.textContentManager)
+            context.coordinator.willChangeContent(in: range)
+        }
+
+        context.events.onDidChangeText { affectedRange, replacementString in
+            guard let replacementString else { return }
+
+            let range = NSRange(affectedRange, in: context.textView.textContentManager)
+            context.coordinator.didChangeContent(
+                context.textView.textContentManager,
+                in: range,
+                delta: replacementString.utf16.count - range.length,
+                limit: context.textView.textContentManager.length
+            )
+        }
+
+        context.events.onDidLayoutViewport { viewportRange in
+            context.coordinator.updateViewportRange(viewportRange)
+        }
+    }
+
+    func makeCoordinator(context: CoordinatorContext) -> TinkerNeonCoordinator {
+        let coordinator = TinkerNeonCoordinator(textView: context.textView, theme: theme, language: language)
+        coordinatorReference = coordinator
+        return coordinator
+    }
+
+    func setHighlightingEnabled(_ enabled: Bool) {
+        coordinatorReference?.setHighlightingEnabled(enabled)
+    }
+
+    func refreshHighlightingForAppearanceChange() {
+        coordinatorReference?.refreshHighlightingForAppearanceChange()
+    }
+
+    func tearDown() {
+        coordinatorReference = nil
+    }
+}
+
+@MainActor
+private final class TinkerNeonCoordinator {
+    private static let virtualPHPPrefix = "<?php\n"
+
+    private(set) var highlighter: Neon.Highlighter?
+    private weak var textView: STTextView?
+    private let theme: Theme
+    private let language: TreeSitterLanguage
+    private let tsLanguage: SwiftTreeSitter.Language
+    private let tsClient: TreeSitterClient
+    private var prevViewportRange: NSTextRange?
+    private var highlightingEnabled = true
+
+    init(textView: STTextView, theme: Theme, language: TreeSitterLanguage) {
+        self.textView = textView
+        self.theme = theme
+        self.language = language
+        tsLanguage = Language(language: language.parser)
+        let virtualPrefixLength = language == .php ? Self.virtualPHPPrefix.utf16.count : 0
+
+        tsClient = try! TreeSitterClient(language: tsLanguage) { codePointIndex in
+            let adjustedCodePointIndex = max(0, codePointIndex - virtualPrefixLength)
+            guard let location = textView.textContentManager.location(at: adjustedCodePointIndex),
+                  let position = textView.textContentManager.position(location)
+            else {
+                return .zero
+            }
+
+            return Point(row: position.row, column: position.column)
+        }
+
+        tsClient.invalidationHandler = { [weak self] indexSet in
+            guard let self else { return }
+            let translated = self.actualIndexSet(fromVirtual: indexSet, limit: textView.textContentManager.length)
+            guard !translated.isEmpty else { return }
+            self.highlighter?.invalidate(.set(translated))
+        }
+
+        textView.font = theme.font(forToken: "plain") ?? textView.font
+
+        highlighter = Neon.Highlighter(
+            textInterface: TinkerNeonTextSystemInterface(textView: textView) { [weak self] token in
+                guard let self, self.highlightingEnabled else {
+                    return nil
+                }
+
+                var attributes: [NSAttributedString.Key: Any] = [:]
+                if let themeColor = self.theme.color(forToken: TokenName(token.name)) {
+                    attributes[.foregroundColor] = themeColor
+
+                    if let themeFont = self.theme.font(forToken: TokenName(token.name)) {
+                        attributes[.font] = themeFont
+                    }
+                } else if let plainColor = self.theme.color(forToken: "plain") {
+                    attributes[.foregroundColor] = plainColor
+
+                    if let themeFont = self.theme.font(forToken: TokenName(token.name)) {
+                        attributes[.font] = themeFont
+                    }
+                }
+
+                return attributes.isEmpty ? nil : attributes
+            },
+            tokenProvider: tokenProvider(textContentManager: textView.textContentManager)
+        )
+
+        let initialContent = virtualizedContent(from: textView.textContentManager.attributedString(in: nil)?.string ?? "")
+        tsClient.willChangeContent(in: .zero)
+        tsClient.didChangeContent(
+            in: .zero,
+            delta: initialContent.utf16.count,
+            limit: initialContent.utf16.count,
+            readHandler: Parser.readFunction(for: initialContent),
+            completionHandler: {}
+        )
+    }
+
+    func updateViewportRange(_ range: NSTextRange?) {
+        if range != prevViewportRange {
+            highlighter?.visibleContentDidChange()
+        }
+        prevViewportRange = range
+    }
+
+    func willChangeContent(in range: NSRange) {
+        tsClient.willChangeContent(in: virtualRange(fromActual: range))
+    }
+
+    func didChangeContent(_ textContentManager: NSTextContentManager, in range: NSRange, delta: Int, limit: Int) {
+        if let string = textContentManager.attributedString(in: nil)?.string {
+            let virtualized = virtualizedContent(from: string)
+            let readFunction = Parser.readFunction(for: virtualized)
+            tsClient.didChangeContent(
+                in: virtualRange(fromActual: range),
+                delta: delta,
+                limit: virtualized.utf16.count,
+                readHandler: readFunction,
+                completionHandler: {}
+            )
+        }
+    }
+
+    func setHighlightingEnabled(_ enabled: Bool) {
+        guard highlightingEnabled != enabled else { return }
+        highlightingEnabled = enabled
+
+        if enabled {
+            refreshHighlightingForAppearanceChange()
+        } else {
+            clearForegroundRenderingAttributes()
+        }
+    }
+
+    func refreshHighlightingForAppearanceChange() {
+        guard highlightingEnabled else { return }
+
+        clearForegroundRenderingAttributes()
+        highlighter?.invalidate(.all)
+        highlighter?.visibleContentDidChange()
+    }
+
+    private func tokenProvider(textContentManager: NSTextContentManager) -> Neon.TokenProvider? {
+        guard let highlightsQuery = try? tsLanguage.query(contentsOf: language.highlightQueryURL!) else {
+            return nil
+        }
+
+        return { [weak self] range, completionHandler in
+            guard let self else {
+                completionHandler(.failure(TreeSitterClientError.stateInvalid))
+                return
+            }
+
+            let translatedRange = self.virtualRange(fromActual: range)
+            self.tsClient.executeHighlightsQuery(
+                highlightsQuery,
+                in: translatedRange,
+                executionMode: .asynchronous(prefetch: true),
+                textProvider: { [weak self] range, _ in
+                    guard let self,
+                          let actualRange = self.actualRange(fromVirtual: range, limit: textContentManager.length),
+                          !actualRange.isEmpty,
+                          let textRange = NSTextRange(actualRange, provider: textContentManager)
+                    else {
+                        return nil
+                    }
+                    return textContentManager.attributedString(in: textRange)?.string
+                }
+            ) { [weak self] result in
+                guard let self else {
+                    completionHandler(.failure(TreeSitterClientError.stateInvalid))
+                    return
+                }
+
+                switch result {
+                case .failure(let error):
+                    completionHandler(.failure(error))
+                case .success(let namedRanges):
+                    let tokens = namedRanges.compactMap { namedRange -> Neon.Token? in
+                        guard let actualRange = self.actualRange(fromVirtual: namedRange.range, limit: textContentManager.length),
+                              !actualRange.isEmpty else {
+                            return nil
+                        }
+                        return Neon.Token(name: namedRange.name, range: actualRange)
+                    }
+                    completionHandler(.success(Neon.TokenApplication(tokens: tokens, range: range)))
+                }
+            }
+        }
+    }
+
+    private var virtualPrefixLength: Int {
+        language == .php ? Self.virtualPHPPrefix.utf16.count : 0
+    }
+
+    private func clearForegroundRenderingAttributes() {
+        guard let textView else { return }
+        let fullRange = NSRange(location: 0, length: textView.textContentManager.length)
+        textView.removeRenderingAttribute(.foregroundColor, range: fullRange)
+    }
+
+    private func virtualizedContent(from raw: String) -> String {
+        guard virtualPrefixLength > 0 else { return raw }
+        return Self.virtualPHPPrefix + raw
+    }
+
+    private func virtualRange(fromActual range: NSRange) -> NSRange {
+        NSRange(location: range.location + virtualPrefixLength, length: range.length)
+    }
+
+    private func actualRange(fromVirtual range: NSRange, limit: Int) -> NSRange? {
+        let start = max(0, range.location - virtualPrefixLength)
+        let end = max(0, range.max - virtualPrefixLength)
+        let clampedStart = min(start, limit)
+        let clampedEnd = min(end, limit)
+        guard clampedEnd >= clampedStart else {
+            return nil
+        }
+        return NSRange(location: clampedStart, length: clampedEnd - clampedStart)
+    }
+
+    private func actualIndexSet(fromVirtual set: IndexSet, limit: Int) -> IndexSet {
+        var translated = IndexSet()
+        for range in set.rangeView {
+            guard let actual = actualRange(fromVirtual: NSRange(range), limit: limit),
+                  !actual.isEmpty else {
+                continue
+            }
+            translated.insert(integersIn: actual.location..<(actual.location + actual.length))
+        }
+        return translated
+    }
+}
+
+private final class TinkerNeonTextSystemInterface: TextSystemInterface {
+    typealias AttributeProvider = (Neon.Token) -> [NSAttributedString.Key: Any]?
+
+    private let textView: STTextView
+    private let attributeProvider: AttributeProvider
+
+    init(textView: STTextView, attributeProvider: @escaping AttributeProvider) {
+        self.textView = textView
+        self.attributeProvider = attributeProvider
+    }
+
+    func clearStyle(in range: NSRange) {
+        guard let textRange = NSTextRange(range, in: textView.textContentManager) else {
+            assertionFailure()
+            return
+        }
+
+        textView.textLayoutManager.removeRenderingAttribute(.foregroundColor, for: textRange)
+        textView.addAttributes([.font: textView.font], range: range)
+    }
+
+    func applyStyle(to token: Neon.Token) {
+        guard let attributes = attributeProvider(token),
+              let textRange = NSTextRange(token.range, in: textView.textContentManager)
+        else {
+            return
+        }
+
+        for attribute in attributes {
+            if attribute.key == .foregroundColor {
+                textView.textLayoutManager.addRenderingAttribute(.foregroundColor, value: attribute.value, for: textRange)
+            } else {
+                textView.addAttributes([attribute.key: attribute.value], range: token.range)
+            }
+        }
+    }
+
+    var length: Int {
+        textView.textContentManager.length
+    }
+
+    var visibleRange: NSRange {
+        guard let viewportRange = textView.textLayoutManager.textViewportLayoutController.viewportRange else {
+            return .zero
+        }
+
+        return NSRange(viewportRange, provider: textView.textContentManager)
     }
 }
 
