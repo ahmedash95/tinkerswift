@@ -12,9 +12,10 @@ settings:
 packages:
   STTextView:
     url: https://github.com/krzyzanowskim/STTextView
-    branch: main
+    from: 2.2.2
   STTextViewPluginNeon:
-    path: Vendor/STTextView-Plugin-Neon
+    url: https://github.com/krzyzanowskim/STTextView-Plugin-Neon
+    branch: main
 targets:
   TinkerSwift:
     type: application

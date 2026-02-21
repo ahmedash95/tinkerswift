@@ -1,5 +1,5 @@
 {
-  "originHash" : "064caa69c502c04c9e019d90a23a18c1b1bc54019084bdd9e7a0aa2efdaf81df",
+  "originHash" : "a94b6961a77ad6ef417fc14576f2df13068c1856616e03b94d34530fe1a8b702",
   "pins" : [
     {
       "identity" : "coretextswift",
@@ -42,8 +42,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/krzyzanowskim/STTextView",
       "state" : {
+        "revision" : "041b1716756b4416aaaafa1022db4cefc9c42ccc",
+        "version" : "2.3.5"
+      }
+    },
+    {
+      "identity" : "sttextview-plugin-neon",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/krzyzanowskim/STTextView-Plugin-Neon",
+      "state" : {
         "branch" : "main",
-        "revision" : "041b1716756b4416aaaafa1022db4cefc9c42ccc"
+        "revision" : "5a30db4ce7908a5414e7b499e2379bdc49991cd1"
       }
     },
     {
