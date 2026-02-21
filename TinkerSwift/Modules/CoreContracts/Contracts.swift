@@ -167,6 +167,11 @@ struct ExecutionContext: Sendable {
     let project: WorkspaceProject
 }
 
+struct FormattingContext: Sendable {
+    let project: WorkspaceProject
+    let fallbackProjectPath: String
+}
+
 struct AppSettings: Sendable {
     var appUIScale: Double
     var showLineNumbers: Bool
@@ -175,6 +180,7 @@ struct AppSettings: Sendable {
     var syntaxHighlighting: Bool
     var lspCompletionEnabled: Bool
     var lspAutoTriggerEnabled: Bool
+    var autoFormatOnRunEnabled: Bool
     var lspServerPathOverride: String
     var phpBinaryPathOverride: String
     var dockerBinaryPathOverride: String
@@ -202,6 +208,10 @@ protocol WorkspacePersistenceStore {
 protocol CodeExecutionProviding: Sendable {
     func run(code: String, context: ExecutionContext) async -> PHPExecutionResult
     func stop() async
+}
+
+protocol CodeFormattingProviding: Sendable {
+    func format(code: String, context: FormattingContext) async -> String?
 }
 
 protocol DefaultProjectInstalling: Sendable {
@@ -258,6 +268,26 @@ struct CompletionCandidate: Sendable {
     let kind: CompletionItemKind?
 }
 
+struct SymbolLocation: Sendable {
+    let uri: String
+    let line: Int
+    let character: Int
+}
+
+struct WorkspaceSymbolCandidate: Sendable {
+    let name: String
+    let detail: String?
+    let kind: CompletionItemKind?
+    let location: SymbolLocation?
+}
+
+struct DocumentSymbolCandidate: Sendable {
+    let name: String
+    let detail: String?
+    let kind: CompletionItemKind?
+    let location: SymbolLocation?
+}
+
 protocol CompletionProviding: Sendable {
     var languageID: String { get }
     func setServerPathOverride(_ value: String) async
@@ -270,6 +300,33 @@ protocol CompletionProviding: Sendable {
         utf16Offset: Int,
         triggerCharacter: String?
     ) async -> [CompletionCandidate]
+    func definitionLocation(
+        uri: String,
+        projectPath: String,
+        text: String,
+        utf16Offset: Int
+    ) async -> SymbolLocation?
+    func workspaceSymbols(projectPath: String, query: String) async -> [WorkspaceSymbolCandidate]
+    func documentSymbols(uri: String, projectPath: String, text: String) async -> [DocumentSymbolCandidate]
+}
+
+extension CompletionProviding {
+    func definitionLocation(
+        uri: String,
+        projectPath: String,
+        text: String,
+        utf16Offset: Int
+    ) async -> SymbolLocation? {
+        nil
+    }
+
+    func workspaceSymbols(projectPath: String, query: String) async -> [WorkspaceSymbolCandidate] {
+        []
+    }
+
+    func documentSymbols(uri: String, projectPath: String, text: String) async -> [DocumentSymbolCandidate] {
+        []
+    }
 }
 
 protocol LanguagePlugin: Sendable {

@@ -159,8 +159,14 @@ struct ContentView: View {
             RenameProjectSheet()
                 .environment(workspaceState)
         }
+        .sheet(isPresented: $workspaceState.isShowingSymbolSearchSheet) {
+            SymbolSearchSheet()
+                .environment(workspaceState)
+        }
         .focusedSceneValue(\.runCodeAction, workspaceState.runOrRestartFromShortcut)
         .focusedSceneValue(\.isRunningScript, workspaceState.isRunning)
+        .focusedSceneValue(\.workspaceSymbolSearchAction, workspaceState.showWorkspaceSymbolSearchFromShortcut)
+        .focusedSceneValue(\.documentSymbolSearchAction, workspaceState.showDocumentSymbolSearchFromShortcut)
     }
 
     @ViewBuilder
@@ -370,6 +376,208 @@ struct DockerProjectSetupSheet: View {
     }
 }
 
+private struct SymbolSearchEntry: Identifiable {
+    let id: String
+    let name: String
+    let detail: String?
+    let kind: CompletionItemKind?
+    let insertText: String
+    let importName: String?
+}
+
+private struct SymbolSearchSheet: View {
+    @Environment(WorkspaceState.self) private var workspaceState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var query = ""
+    @State private var isLoading = false
+    @State private var entries: [SymbolSearchEntry] = []
+    @State private var selectedEntryID: String?
+
+    var body: some View {
+        @Bindable var workspaceState = workspaceState
+
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Symbol Search")
+                .font(.title3.weight(.semibold))
+
+            Picker("Scope", selection: $workspaceState.symbolSearchMode) {
+                Text("Workspace").tag(SymbolSearchMode.workspace)
+                Text("Document").tag(SymbolSearchMode.document)
+            }
+            .pickerStyle(.segmented)
+
+            TextField(
+                workspaceState.symbolSearchMode == .workspace ? "Type to search workspace symbols" : "Filter document symbols",
+                text: $query
+            )
+            .textFieldStyle(.roundedBorder)
+
+            if isLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Searching symbols...")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            List(entries, selection: $selectedEntryID) { entry in
+                HStack(spacing: 10) {
+                    Image(systemName: entry.kind?.paletteSymbolName ?? "textformat")
+                        .foregroundStyle(entry.kind?.paletteColor ?? .secondary)
+                        .frame(width: 14)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(entry.name)
+                            .font(.body.weight(.medium))
+                            .lineLimit(1)
+                        if let detail = entry.detail, !detail.isEmpty {
+                            Text(detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) {
+                    insert(entry)
+                }
+            }
+            .frame(minHeight: 260)
+
+            HStack {
+                Button("Close") {
+                    dismiss()
+                }
+                Spacer()
+
+                Button("Copy") {
+                    copySelected()
+                }
+                .disabled(selectedEntry == nil)
+
+                Button("Import") {
+                    importSelected()
+                }
+                .disabled(selectedEntry?.importName == nil)
+
+                Button("Insert") {
+                    insertSelected()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(selectedEntry == nil)
+            }
+        }
+        .padding(18)
+        .frame(width: 760, height: 520)
+        .task {
+            await reloadSymbols()
+        }
+        .onChange(of: workspaceState.symbolSearchMode) { _, _ in
+            Task { await reloadSymbols() }
+        }
+        .onChange(of: query) { _, _ in
+            Task { await reloadSymbols() }
+        }
+    }
+
+    private var selectedEntry: SymbolSearchEntry? {
+        guard let selectedEntryID else { return nil }
+        return entries.first(where: { $0.id == selectedEntryID })
+    }
+
+    private func reloadSymbols() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        switch workspaceState.symbolSearchMode {
+        case .workspace:
+            let symbols = await workspaceState.searchWorkspaceSymbols(query: query)
+            entries = symbols.map { symbol in
+                let importName = workspaceImportName(for: symbol)
+                return SymbolSearchEntry(
+                    id: "workspace:\(symbol.location?.uri ?? ""):\(symbol.location?.line ?? -1):\(symbol.name)",
+                    name: symbol.name,
+                    detail: symbol.detail,
+                    kind: symbol.kind,
+                    insertText: workspaceInsertText(for: symbol, importName: importName),
+                    importName: importName
+                )
+            }
+        case .document:
+            let symbols = await workspaceState.searchDocumentSymbols(query: query)
+            entries = symbols.map { symbol in
+                SymbolSearchEntry(
+                    id: "document:\(symbol.location?.line ?? -1):\(symbol.name)",
+                    name: symbol.name,
+                    detail: symbol.detail,
+                    kind: symbol.kind,
+                    insertText: symbol.name,
+                    importName: nil
+                )
+            }
+        }
+
+        if let selectedEntryID, entries.contains(where: { $0.id == selectedEntryID }) {
+            return
+        }
+        selectedEntryID = entries.first?.id
+    }
+
+    private func insertSelected() {
+        guard let selectedEntry else { return }
+        insert(selectedEntry)
+    }
+
+    private func insert(_ entry: SymbolSearchEntry) {
+        workspaceState.insertSymbolTextAtCursor(entry.insertText)
+        dismiss()
+    }
+
+    private func importSelected() {
+        guard let selectedEntry, let importName = selectedEntry.importName else { return }
+        workspaceState.importSymbol(name: importName, detail: nil)
+        dismiss()
+    }
+
+    private func copySelected() {
+        guard let selectedEntry else { return }
+        workspaceState.copyTextToPasteboard(selectedEntry.importName ?? selectedEntry.insertText)
+    }
+
+    private func workspaceImportName(for symbol: WorkspaceSymbolCandidate) -> String? {
+        let rawName = symbol.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if rawName.contains("\\") {
+            return rawName
+        }
+        guard let detail = symbol.detail?.trimmingCharacters(in: .whitespacesAndNewlines),
+              detail.contains("\\")
+        else {
+            return nil
+        }
+        if detail.hasSuffix("\\\(rawName)") {
+            return detail
+        }
+        return "\(detail)\\\(rawName)"
+    }
+
+    private func workspaceInsertText(for symbol: WorkspaceSymbolCandidate, importName: String?) -> String {
+        if let importName {
+            let last = importName.split(separator: "\\").last.map(String.init)
+            if let last, !last.isEmpty {
+                return last
+            }
+        }
+        let trimmed = symbol.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.contains("\\") {
+            return trimmed.split(separator: "\\").last.map(String.init) ?? trimmed
+        }
+        return trimmed
+    }
+}
+
 struct RenameProjectSheet: View {
     @Environment(WorkspaceState.self) private var workspaceState
     @Environment(\.dismiss) private var dismiss
@@ -400,6 +608,80 @@ struct RenameProjectSheet: View {
         }
         .padding(18)
         .frame(width: 420)
+    }
+}
+
+private extension CompletionItemKind {
+    var paletteSymbolName: String {
+        switch self {
+        case .method:
+            return "function"
+        case .function:
+            return "fx"
+        case .constructor:
+            return "wrench.and.screwdriver"
+        case .field:
+            return "line.3.horizontal.decrease.circle"
+        case .variable:
+            return "character.textbox"
+        case .class:
+            return "c.square"
+        case .interface:
+            return "square.stack.3d.up"
+        case .module:
+            return "shippingbox"
+        case .property:
+            return "slider.horizontal.3"
+        case .unit:
+            return "ruler"
+        case .value:
+            return "number"
+        case .enum:
+            return "list.number"
+        case .keyword:
+            return "captions.bubble"
+        case .snippet:
+            return "chevron.left.forwardslash.chevron.right"
+        case .color:
+            return "paintpalette"
+        case .file:
+            return "doc.text"
+        case .reference:
+            return "link"
+        case .folder:
+            return "folder"
+        case .enumMember:
+            return "list.bullet"
+        case .constant:
+            return "number.square"
+        case .struct:
+            return "cube.box"
+        case .event:
+            return "bolt.circle"
+        case .operator:
+            return "plus.slash.minus"
+        case .typeParameter:
+            return "tag"
+        case .text:
+            return "textformat"
+        }
+    }
+
+    var paletteColor: Color {
+        switch self {
+        case .method, .function, .constructor:
+            return .blue
+        case .class, .interface, .struct, .enum:
+            return .orange
+        case .property, .field, .variable, .constant:
+            return .green
+        case .keyword, .operator:
+            return .purple
+        case .module, .file, .folder:
+            return .teal
+        default:
+            return .secondary
+        }
     }
 }
 

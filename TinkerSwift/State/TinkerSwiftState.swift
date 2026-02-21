@@ -8,6 +8,11 @@ enum ResultViewMode: String, CaseIterable {
     case raw
 }
 
+enum SymbolSearchMode: String, CaseIterable {
+    case workspace
+    case document
+}
+
 private struct RunHistoryWindowView: View {
     @Environment(WorkspaceState.self) private var workspaceState
 
@@ -304,6 +309,10 @@ final class AppModel {
         didSet { persistSettings() }
     }
 
+    var autoFormatOnRunEnabled: Bool {
+        didSet { persistSettings() }
+    }
+
     var lspServerPathOverride: String {
         didSet { persistSettings() }
     }
@@ -352,6 +361,7 @@ final class AppModel {
         syntaxHighlighting = snapshot.settings.syntaxHighlighting
         lspCompletionEnabled = snapshot.settings.lspCompletionEnabled
         lspAutoTriggerEnabled = snapshot.settings.lspAutoTriggerEnabled
+        autoFormatOnRunEnabled = snapshot.settings.autoFormatOnRunEnabled
         lspServerPathOverride = snapshot.settings.lspServerPathOverride
         phpBinaryPathOverride = snapshot.settings.phpBinaryPathOverride
         dockerBinaryPathOverride = snapshot.settings.dockerBinaryPathOverride
@@ -410,6 +420,7 @@ final class AppModel {
                 syntaxHighlighting: syntaxHighlighting,
                 lspCompletionEnabled: lspCompletionEnabled,
                 lspAutoTriggerEnabled: lspAutoTriggerEnabled,
+                autoFormatOnRunEnabled: autoFormatOnRunEnabled,
                 lspServerPathOverride: lspServerPathOverride,
                 phpBinaryPathOverride: phpBinaryPathOverride,
                 dockerBinaryPathOverride: dockerBinaryPathOverride,
@@ -462,7 +473,9 @@ return $users->toJson();
     }()
 
     let appModel: AppModel
+    private let pluginRegistry: LanguagePluginRegistry?
     private let executionProvider: any CodeExecutionProviding
+    private let codeFormatter: any CodeFormattingProviding
     private let defaultProjectInstaller: any DefaultProjectInstalling
     private let dockerEnvironmentService: DockerEnvironmentService
     private let defaultProject = WorkspaceProject.local(path: WorkspaceState.defaultProjectPath)
@@ -473,6 +486,8 @@ return $users->toJson();
     var isPickingProjectFolder = false
     var isShowingDockerProjectSheet = false
     var isShowingRenameProjectSheet = false
+    var isShowingSymbolSearchSheet = false
+    var symbolSearchMode: SymbolSearchMode = .workspace
     var renamingProjectID = ""
     var renamingProjectName = ""
     var isRunning = false
@@ -482,11 +497,13 @@ return $users->toJson();
     var defaultProjectInstallErrorMessage = ""
     private var pendingRestartAfterStop = false
     private var isRestoringProjectDraft = false
+    private var codeRevision: UInt64 = 0
     var lastRunMetrics: RunMetrics?
     var resultViewMode: ResultViewMode = .pretty
     var rawStreamMode: RawStreamMode = .output
     var code = defaultCode {
         didSet {
+            codeRevision &+= 1
             guard !isRestoringProjectDraft else { return }
             appModel.setEditorDraft(code, for: selectedProjectID)
         }
@@ -509,12 +526,16 @@ return $users->toJson();
 
     init(
         appModel: AppModel,
+        pluginRegistry: LanguagePluginRegistry? = nil,
         executionProvider: any CodeExecutionProviding = PHPExecutionRunner(),
+        codeFormatter: any CodeFormattingProviding = PintCodeFormatter(),
         defaultProjectInstaller: any DefaultProjectInstalling = LaravelProjectInstaller(),
         dockerEnvironmentService: DockerEnvironmentService = .shared
     ) {
         self.appModel = appModel
+        self.pluginRegistry = pluginRegistry
         self.executionProvider = executionProvider
+        self.codeFormatter = codeFormatter
         self.defaultProjectInstaller = defaultProjectInstaller
         self.dockerEnvironmentService = dockerEnvironmentService
         let savedProjectID = appModel.lastSelectedProjectID
@@ -569,6 +590,11 @@ return $users->toJson();
         set { appModel.lspAutoTriggerEnabled = newValue }
     }
 
+    var autoFormatOnRunEnabled: Bool {
+        get { appModel.autoFormatOnRunEnabled }
+        set { appModel.autoFormatOnRunEnabled = newValue }
+    }
+
     var lspServerPathOverride: String {
         get { appModel.lspServerPathOverride }
         set { appModel.lspServerPathOverride = newValue }
@@ -591,18 +617,38 @@ return $users->toJson();
     }
 
     var isLSPAvailableForSelectedProject: Bool {
-        guard let selectedProject else { return false }
-        guard case let .local(path) = selectedProject.connection else { return false }
-        var isDirectory: ObjCBool = false
-        return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
+        if case let .local(path)? = selectedProject?.connection {
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue {
+                return true
+            }
+        }
+
+        var fallbackIsDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: defaultProject.path, isDirectory: &fallbackIsDirectory) && fallbackIsDirectory.boolValue
     }
 
     var completionProjectPath: String {
-        selectedProjectPath
+        if case let .local(path)? = selectedProject?.connection {
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue {
+                return path
+            }
+        }
+        return defaultProject.path
     }
 
     var effectiveLSPCompletionEnabled: Bool {
-        lspCompletionEnabled && isLSPAvailableForSelectedProject
+        lspCompletionEnabled && isLSPAvailableForSelectedProject && completionProvider != nil
+    }
+
+    var completionProvider: (any CompletionProviding)? {
+        let languageID = selectedProject?.languageID ?? "php"
+        return pluginRegistry?.plugin(forLanguageID: languageID)?.completionProvider ?? PHPLSPService.shared
+    }
+
+    var completionLanguageID: String {
+        selectedProject?.languageID ?? "php"
     }
 
     var selectedProjectName: String {
@@ -734,6 +780,24 @@ return $users->toJson();
 
     var canShowRunHistory: Bool {
         !selectedProjectID.isEmpty
+    }
+
+    var canShowSymbolSearch: Bool {
+        completionProvider != nil && effectiveLSPCompletionEnabled
+    }
+
+    var showWorkspaceSymbolSearchFromShortcut: (() -> Void)? {
+        guard canShowSymbolSearch else { return nil }
+        return { [weak self] in
+            self?.showWorkspaceSymbolSearch()
+        }
+    }
+
+    var showDocumentSymbolSearchFromShortcut: (() -> Void)? {
+        guard canShowSymbolSearch else { return nil }
+        return { [weak self] in
+            self?.showDocumentSymbolSearch()
+        }
     }
 
     func toggleRunStop() {
@@ -884,6 +948,64 @@ return $users->toJson();
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    func showWorkspaceSymbolSearch() {
+        guard canShowSymbolSearch else { return }
+        symbolSearchMode = .workspace
+        isShowingSymbolSearchSheet = true
+    }
+
+    func showDocumentSymbolSearch() {
+        guard canShowSymbolSearch else { return }
+        symbolSearchMode = .document
+        isShowingSymbolSearchSheet = true
+    }
+
+    func searchWorkspaceSymbols(query: String) async -> [WorkspaceSymbolCandidate] {
+        guard let completionProvider else { return [] }
+        return await completionProvider.workspaceSymbols(projectPath: completionProjectPath, query: query)
+    }
+
+    func searchDocumentSymbols(query: String) async -> [DocumentSymbolCandidate] {
+        guard let completionProvider else { return [] }
+        let symbols = await completionProvider.documentSymbols(
+            uri: completionDocumentURI,
+            projectPath: completionProjectPath,
+            text: code
+        )
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else { return symbols }
+
+        return symbols.filter { symbol in
+            symbol.name.localizedCaseInsensitiveContains(trimmedQuery) ||
+                (symbol.detail?.localizedCaseInsensitiveContains(trimmedQuery) ?? false)
+        }
+    }
+
+    func insertSymbolTextAtCursor(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        NotificationCenter.default.post(
+            name: .tinkerSwiftInsertTextAtCursor,
+            object: nil,
+            userInfo: ["text": trimmed]
+        )
+    }
+
+    func copyTextToPasteboard(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        #if os(macOS)
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(trimmed, forType: .string)
+        #endif
+    }
+
+    func importSymbol(name: String, detail: String?) {
+        guard let fqcn = inferFullyQualifiedSymbolName(name: name, detail: detail) else { return }
+        addUseStatement(fqcn: fqcn)
+    }
+
     func selectRunHistoryItemIfNeeded() {
         if selectedRunHistoryItem != nil {
             return
@@ -918,10 +1040,21 @@ return $users->toJson();
         }
 
         while true {
-            resultMessage = "Running script..."
-            appModel.recordRunHistory(projectID: selectedProjectID, code: code)
+            let runCodeSnapshot = code
+            let runRevisionSnapshot = codeRevision
+            scheduleAutoFormatIfNeeded(
+                codeSnapshot: runCodeSnapshot,
+                revisionSnapshot: runRevisionSnapshot,
+                project: selectedProject
+            )
 
-            let execution = await executionProvider.run(code: code, context: ExecutionContext(project: selectedProject))
+            resultMessage = "Running script..."
+            appModel.recordRunHistory(projectID: selectedProjectID, code: runCodeSnapshot)
+
+            let execution = await executionProvider.run(
+                code: runCodeSnapshot,
+                context: ExecutionContext(project: selectedProject)
+            )
             latestExecution = execution
 
             if execution.wasStopped {
@@ -952,6 +1085,32 @@ return $users->toJson();
             await executionProvider.stop()
         }
         resultMessage = statusMessage
+    }
+
+    private func scheduleAutoFormatIfNeeded(
+        codeSnapshot: String,
+        revisionSnapshot: UInt64,
+        project: WorkspaceProject
+    ) {
+        guard autoFormatOnRunEnabled else { return }
+
+        let formatter = codeFormatter
+        Task {
+            guard let formatted = await formatter.format(
+                code: codeSnapshot,
+                context: FormattingContext(
+                    project: project,
+                    fallbackProjectPath: Self.defaultProjectPath
+                )
+            ) else {
+                return
+            }
+
+            guard codeRevision == revisionSnapshot else { return }
+            guard code == codeSnapshot else { return }
+            guard formatted != codeSnapshot else { return }
+            code = formatted
+        }
     }
 
     private var runHistoryWindowTitle: String {
@@ -1032,5 +1191,83 @@ return $users->toJson();
             return String(format: "%.0f ms", durationMs)
         }
         return String(format: "%.2f s", durationMs / 1000)
+    }
+
+    private var completionDocumentURI: String {
+        URL(fileURLWithPath: completionProjectPath, isDirectory: true)
+            .appendingPathComponent(".tinkerswift_scratch.php")
+            .standardizedFileURL
+            .absoluteString
+    }
+
+    private func inferFullyQualifiedSymbolName(name: String, detail: String?) -> String? {
+        let normalizedName = sanitizeSymbolName(name)
+        guard !normalizedName.isEmpty else { return nil }
+        if normalizedName.contains("\\") {
+            return normalizedName
+        }
+
+        guard let detail else { return nil }
+        let normalizedDetail = sanitizeSymbolName(detail)
+        guard normalizedDetail.contains("\\") else { return nil }
+        if normalizedDetail.hasSuffix("\\\(normalizedName)") {
+            return normalizedDetail
+        }
+        return "\(normalizedDetail)\\\(normalizedName)"
+    }
+
+    private func sanitizeSymbolName(_ value: String) -> String {
+        var result = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "class ", with: "")
+            .replacingOccurrences(of: "interface ", with: "")
+            .replacingOccurrences(of: "trait ", with: "")
+            .replacingOccurrences(of: "enum ", with: "")
+        while result.hasPrefix("\\") {
+            result.removeFirst()
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func addUseStatement(fqcn: String) {
+        let normalized = sanitizeSymbolName(fqcn)
+        guard !normalized.isEmpty else { return }
+
+        var lines = code.components(separatedBy: "\n")
+        let escaped = NSRegularExpression.escapedPattern(for: normalized)
+        let existingPattern = #"^\s*use\s+\\?"# + escaped + #"\s*;\s*$"#
+        if lines.contains(where: { $0.range(of: existingPattern, options: .regularExpression) != nil }) {
+            return
+        }
+
+        var insertIndex = 0
+        if let first = lines.first, first.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<?php") {
+            insertIndex = 1
+        }
+
+        while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            insertIndex += 1
+        }
+        if insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("declare(") {
+            insertIndex += 1
+            while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                insertIndex += 1
+            }
+        }
+        if insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("namespace ") {
+            insertIndex += 1
+            while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                insertIndex += 1
+            }
+        }
+        while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("use ") {
+            insertIndex += 1
+        }
+
+        lines.insert("use \(normalized);", at: insertIndex)
+        if insertIndex + 1 < lines.count && !lines[insertIndex + 1].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            lines.insert("", at: insertIndex + 1)
+        }
+        code = lines.joined(separator: "\n")
     }
 }

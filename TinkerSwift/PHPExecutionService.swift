@@ -148,6 +148,120 @@ private struct DockerCommandResult {
     let exitCode: Int32
 }
 
+actor PintCodeFormatter: CodeFormattingProviding {
+    func format(code: String, context: FormattingContext) async -> String? {
+        guard let workspacePath = formatterWorkspacePath(for: context),
+              let pintPath = pintBinaryPath(in: workspacePath)
+        else {
+            return nil
+        }
+
+        let workspaceURL = URL(fileURLWithPath: workspacePath, isDirectory: true)
+        let id = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        let tempFileName = ".tinkerswift_format_\(id).php"
+        let tempFileURL = workspaceURL.appendingPathComponent(tempFileName, isDirectory: false)
+        let wrappedSnippet = Self.wrappedPHP(code)
+
+        do {
+            try wrappedSnippet.write(to: tempFileURL, atomically: true, encoding: .utf8)
+        } catch {
+            return nil
+        }
+
+        defer {
+            try? FileManager.default.removeItem(at: tempFileURL)
+        }
+
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.currentDirectoryURL = workspaceURL
+        process.environment = BinaryPathResolver.processEnvironment()
+        process.executableURL = URL(fileURLWithPath: pintPath)
+        process.arguments = [
+            "--no-interaction",
+            "--quiet",
+            tempFileName
+        ]
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        do {
+            try await runAndWaitForTermination(process)
+        } catch {
+            return nil
+        }
+
+        guard process.terminationStatus == 0 else {
+            return nil
+        }
+
+        guard let data = try? Data(contentsOf: tempFileURL),
+              let formatted = String(data: data, encoding: .utf8)
+        else {
+            return nil
+        }
+
+        return Self.unwrappedPHP(formatted)
+    }
+
+    private func formatterWorkspacePath(for context: FormattingContext) -> String? {
+        switch context.project.connection {
+        case let .local(path):
+            if pintBinaryPath(in: path) != nil {
+                return path
+            }
+        case .docker, .ssh:
+            break
+        }
+
+        if pintBinaryPath(in: context.fallbackProjectPath) != nil {
+            return context.fallbackProjectPath
+        }
+        return nil
+    }
+
+    private func pintBinaryPath(in projectPath: String) -> String? {
+        let candidate = URL(fileURLWithPath: projectPath, isDirectory: true)
+            .appendingPathComponent("vendor/bin/pint", isDirectory: false)
+            .path
+        return FileManager.default.isExecutableFile(atPath: candidate) ? candidate : nil
+    }
+
+    private static func wrappedPHP(_ rawCode: String) -> String {
+        let body = unwrappedPHP(rawCode)
+        return "<?php\n\(body)\n"
+    }
+
+    private static func unwrappedPHP(_ rawCode: String) -> String {
+        var code = rawCode.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let openTagRange = code.range(of: #"^\s*<\?(?:php|=)?"#, options: .regularExpression) {
+            code.removeSubrange(openTagRange)
+        }
+        if let closeTagRange = code.range(of: #"\?>\s*$"#, options: .regularExpression) {
+            code.removeSubrange(closeTagRange)
+        }
+
+        return code.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func runAndWaitForTermination(_ process: Process) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            process.terminationHandler = { _ in
+                continuation.resume()
+            }
+
+            do {
+                try process.run()
+            } catch {
+                process.terminationHandler = nil
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+}
+
 actor PHPExecutionRunner: CodeExecutionProviding {
     private struct RuntimeMetrics: Decodable {
         let durationMs: Double

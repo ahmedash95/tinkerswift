@@ -3,6 +3,7 @@ import SwiftUI
 
 extension Notification.Name {
     static let tinkerSwiftNewTabRequested = Notification.Name("com.ahmed.tinkerswift.newTabRequested")
+    static let tinkerSwiftInsertTextAtCursor = Notification.Name("com.ahmed.tinkerswift.insertTextAtCursor")
 }
 
 @MainActor

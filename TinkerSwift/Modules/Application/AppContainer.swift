@@ -8,16 +8,19 @@ final class AppContainer {
     let appModel: AppModel
 
     private let phpExecutionProvider: any CodeExecutionProviding
+    private let codeFormatterProvider: any CodeFormattingProviding
     private let defaultProjectInstaller: any DefaultProjectInstalling
 
     init(
         persistenceStore: any WorkspacePersistenceStore = UserDefaultsWorkspaceStore(),
         phpExecutionProvider: any CodeExecutionProviding = PHPExecutionRunner(),
+        codeFormatterProvider: any CodeFormattingProviding = PintCodeFormatter(),
         defaultProjectInstaller: any DefaultProjectInstalling = LaravelProjectInstaller()
     ) {
         self.persistenceStore = persistenceStore
         self.pluginRegistry = LanguagePluginRegistry()
         self.phpExecutionProvider = phpExecutionProvider
+        self.codeFormatterProvider = codeFormatterProvider
         self.defaultProjectInstaller = defaultProjectInstaller
         self.appModel = AppModel(persistenceStore: persistenceStore)
 
@@ -26,7 +29,7 @@ final class AppContainer {
                 id: "php",
                 displayName: "PHP",
                 supportedLanguageIDs: ["php"],
-                completionProvider: nil,
+                completionProvider: PHPLSPService.shared,
                 executionProvider: phpExecutionProvider
             )
         )
@@ -35,7 +38,9 @@ final class AppContainer {
     func makeWorkspaceState() -> WorkspaceState {
         WorkspaceState(
             appModel: appModel,
+            pluginRegistry: pluginRegistry,
             executionProvider: phpExecutionProvider,
+            codeFormatter: codeFormatterProvider,
             defaultProjectInstaller: defaultProjectInstaller
         )
     }

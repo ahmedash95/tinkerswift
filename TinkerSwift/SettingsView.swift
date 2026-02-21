@@ -70,6 +70,19 @@ private struct EditorSettingsTab: View {
                     isOn: $appModel.lspAutoTriggerEnabled
                 )
             }
+
+            Section(
+                header: Text("Run"),
+                footer: Text("Formatting runs in background with Laravel Pint and never blocks execution.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            ) {
+                SettingsToggleRow(
+                    title: "Auto Format On Run",
+                    description: "Format code automatically each time you run.",
+                    isOn: $appModel.autoFormatOnRunEnabled
+                )
+            }
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)

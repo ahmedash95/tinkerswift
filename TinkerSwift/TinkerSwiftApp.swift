@@ -9,6 +9,14 @@ private struct IsRunningKey: FocusedValueKey {
     typealias Value = Bool
 }
 
+private struct WorkspaceSymbolSearchActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+private struct DocumentSymbolSearchActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
 extension FocusedValues {
     var runCodeAction: (() -> Void)? {
         get { self[RunCodeActionKey.self] }
@@ -19,6 +27,16 @@ extension FocusedValues {
         get { self[IsRunningKey.self] }
         set { self[IsRunningKey.self] = newValue }
     }
+
+    var workspaceSymbolSearchAction: (() -> Void)? {
+        get { self[WorkspaceSymbolSearchActionKey.self] }
+        set { self[WorkspaceSymbolSearchActionKey.self] = newValue }
+    }
+
+    var documentSymbolSearchAction: (() -> Void)? {
+        get { self[DocumentSymbolSearchActionKey.self] }
+        set { self[DocumentSymbolSearchActionKey.self] = newValue }
+    }
 }
 
 private struct TinkerSwiftCommands: Commands {
@@ -26,6 +44,8 @@ private struct TinkerSwiftCommands: Commands {
 
     @FocusedValue(\.runCodeAction) private var runCodeAction
     @FocusedValue(\.isRunningScript) private var isRunningScript
+    @FocusedValue(\.workspaceSymbolSearchAction) private var workspaceSymbolSearchAction
+    @FocusedValue(\.documentSymbolSearchAction) private var documentSymbolSearchAction
 
     var body: some Commands {
         CommandMenu("Run") {
@@ -74,6 +94,20 @@ private struct TinkerSwiftCommands: Commands {
                 NSApp.sendAction(#selector(NSStandardKeyBindingResponding.complete(_:)), to: nil, from: nil)
             }
             .keyboardShortcut("m", modifiers: [.command, .shift])
+
+            Divider()
+
+            Button("Search Workspace Symbols") {
+                workspaceSymbolSearchAction?()
+            }
+            .keyboardShortcut("o", modifiers: [.command, .shift])
+            .disabled(workspaceSymbolSearchAction == nil)
+
+            Button("Search Document Symbols") {
+                documentSymbolSearchAction?()
+            }
+            .keyboardShortcut("o", modifiers: [.command, .option])
+            .disabled(documentSymbolSearchAction == nil)
         }
     }
 }

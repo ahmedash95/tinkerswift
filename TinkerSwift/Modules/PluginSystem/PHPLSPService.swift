@@ -179,6 +179,7 @@ actor PHPLSPService: CompletionProviding {
     private var rootProjectPath = ""
     private var sessions: [String: LSPDocumentState] = [:]
     private var serverPathOverride = ""
+    private var builtinPHPFunctions: [String]?
     let languageID = "php"
 
     func setServerPathOverride(_ value: String) async {
@@ -277,8 +278,9 @@ actor PHPLSPService: CompletionProviding {
             return []
         }
 
+        let lspItems: [CompletionCandidate]
         do {
-            return try await requestCompletionItems(
+            lspItems = try await requestCompletionItems(
                 uri: uri,
                 projectPath: projectPath,
                 text: text,
@@ -291,7 +293,7 @@ actor PHPLSPService: CompletionProviding {
             if case LSPError.timeout = error {
                 log("completion request timed out; retrying once")
                 do {
-                    return try await requestCompletionItems(
+                    lspItems = try await requestCompletionItems(
                         uri: uri,
                         projectPath: projectPath,
                         text: text,
@@ -300,17 +302,15 @@ actor PHPLSPService: CompletionProviding {
                         timeoutSeconds: 2.0,
                         resolveTopItem: false
                     )
-                } catch {
-                    log("completion retry failed after timeout: \(error.localizedDescription)")
-                    return []
+                } catch let retryError {
+                    log("completion retry failed after timeout: \(retryError.localizedDescription)")
+                    lspItems = []
                 }
-            }
-
-            if case LSPError.disconnected = error {
+            } else if case LSPError.disconnected = error {
                 log("completion request disconnected; restarting phpactor and retrying once")
                 await stopServer(sendShutdown: false)
                 do {
-                    return try await requestCompletionItems(
+                    lspItems = try await requestCompletionItems(
                         uri: uri,
                         projectPath: projectPath,
                         text: text,
@@ -319,13 +319,94 @@ actor PHPLSPService: CompletionProviding {
                         timeoutSeconds: 2.5,
                         resolveTopItem: false
                     )
-                } catch {
-                    log("completion retry failed after reconnect: \(error.localizedDescription)")
-                    return []
+                } catch let retryError {
+                    log("completion retry failed after reconnect: \(retryError.localizedDescription)")
+                    lspItems = []
                 }
+            } else {
+                log("completion request failed: \(error.localizedDescription)")
+                lspItems = []
             }
+        }
 
-            log("completion request failed: \(error.localizedDescription)")
+        if !lspItems.isEmpty {
+            return lspItems
+        }
+
+        let fallbackItems = await fallbackBuiltinFunctionCompletions(
+            text: text,
+            utf16Offset: utf16Offset
+        )
+        if !fallbackItems.isEmpty {
+            log("fallback completion response items=\(fallbackItems.count)")
+        }
+        return fallbackItems
+    }
+
+    func definitionLocation(
+        uri: String,
+        projectPath: String,
+        text: String,
+        utf16Offset: Int
+    ) async -> SymbolLocation? {
+        guard !uri.isEmpty else { return nil }
+
+        do {
+            try await ensureServer(for: projectPath)
+            await openOrUpdateDocument(uri: uri, projectPath: projectPath, text: text, languageID: languageID)
+            let prepared = prepareDocumentText(text)
+            let sourcePosition = LSPPositionConverter.position(in: text, utf16Offset: utf16Offset)
+            let lspPosition = (line: sourcePosition.line + prepared.lineOffset, character: sourcePosition.character)
+
+            let response = try await request(
+                method: "textDocument/definition",
+                params: [
+                    "textDocument": ["uri": uri],
+                    "position": ["line": lspPosition.line, "character": lspPosition.character]
+                ],
+                timeoutSeconds: 2.0
+            )
+            return parseDefinitionLocation(from: response)
+        } catch {
+            log("definition request failed: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    func workspaceSymbols(projectPath: String, query: String) async -> [WorkspaceSymbolCandidate] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        do {
+            try await ensureServer(for: projectPath)
+            let response = try await request(
+                method: "workspace/symbol",
+                params: ["query": trimmed],
+                timeoutSeconds: 2.5
+            )
+            return parseWorkspaceSymbols(from: response)
+        } catch {
+            log("workspace/symbol failed: \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    func documentSymbols(uri: String, projectPath: String, text: String) async -> [DocumentSymbolCandidate] {
+        guard !uri.isEmpty else { return [] }
+
+        do {
+            try await ensureServer(for: projectPath)
+            await openOrUpdateDocument(uri: uri, projectPath: projectPath, text: text, languageID: languageID)
+            let response = try await request(
+                method: "textDocument/documentSymbol",
+                params: [
+                    "textDocument": ["uri": uri]
+                ],
+                timeoutSeconds: 2.5
+            )
+            return parseDocumentSymbols(from: response, defaultURI: uri)
+        } catch {
+            log("documentSymbol failed: \(error.localizedDescription)")
             return []
         }
     }
@@ -340,7 +421,7 @@ actor PHPLSPService: CompletionProviding {
         resolveTopItem: Bool
     ) async throws -> [CompletionCandidate] {
         try await ensureServer(for: projectPath)
-        await openOrUpdateDocument(uri: uri, projectPath: projectPath, text: text, languageID: "php")
+        await openOrUpdateDocument(uri: uri, projectPath: projectPath, text: text, languageID: languageID)
 
         let prepared = prepareDocumentText(text)
         let sourcePosition = LSPPositionConverter.position(in: text, utf16Offset: utf16Offset)
@@ -377,7 +458,9 @@ actor PHPLSPService: CompletionProviding {
             }
         }
 
-        let parsed = parsedItems.map(\.candidate)
+        let parsed = parsedItems.map { item in
+            addFallbackImportEditIfNeeded(to: item, sourceText: text)
+        }
         let docsCount = parsed.reduce(into: 0) { partialResult, item in
             let documentation = item.documentation?.trimmingCharacters(in: .whitespacesAndNewlines)
             if documentation?.isEmpty == false {
@@ -763,6 +846,244 @@ actor PHPLSPService: CompletionProviding {
         }
     }
 
+    private func addFallbackImportEditIfNeeded(to item: LSPParsedCompletionItem, sourceText: String) -> CompletionCandidate {
+        let candidate = item.candidate
+        guard needsImportFallback(for: candidate) else {
+            return candidate
+        }
+
+        guard let fqcn = inferImportFQCN(for: item) else {
+            return candidate
+        }
+
+        guard let importEdit = makeImportTextEdit(fqcn: fqcn, in: sourceText) else {
+            return candidate
+        }
+
+        log("completion fallback import label=\(candidate.label) fqcn=\(fqcn)")
+        return CompletionCandidate(
+            id: candidate.id,
+            label: candidate.label,
+            detail: candidate.detail,
+            documentation: candidate.documentation,
+            sortText: candidate.sortText,
+            insertText: candidate.insertText,
+            insertSelectionRange: candidate.insertSelectionRange,
+            primaryTextEdit: candidate.primaryTextEdit,
+            additionalTextEdits: [importEdit],
+            kind: candidate.kind
+        )
+    }
+
+    private func needsImportFallback(for candidate: CompletionCandidate) -> Bool {
+        guard isImportableCompletionKind(candidate.kind) else {
+            return false
+        }
+        guard candidate.additionalTextEdits.isEmpty else {
+            return false
+        }
+        let insertedText = candidate.primaryTextEdit?.newText ?? candidate.insertText
+        if insertedText.contains("\\") {
+            return false
+        }
+        return true
+    }
+
+    private func isImportableCompletionKind(_ kind: CompletionItemKind?) -> Bool {
+        guard let kind else { return false }
+        switch kind {
+        case .class, .interface, .enum, .struct:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func inferImportFQCN(for item: LSPParsedCompletionItem) -> String? {
+        let candidate = item.candidate
+        let normalizedLabel = sanitizeSymbolName(candidate.label)
+        let shortName = normalizedLabel.split(separator: "\\").last.map(String.init) ?? normalizedLabel
+        guard !shortName.isEmpty else {
+            return nil
+        }
+
+        let textSources: [String?] = [
+            candidate.detail,
+            candidate.label,
+            candidate.insertText,
+            item.rawObject["detail"]?.stringValue,
+            item.rawObject["insertText"]?.stringValue,
+            item.rawObject["labelDetails"]?["description"]?.stringValue,
+            item.rawObject["labelDetails"]?["detail"]?.stringValue
+        ]
+
+        for source in textSources {
+            guard let source, !source.isEmpty else { continue }
+            if let match = bestFQCNMatch(in: source, shortName: shortName) {
+                return match
+            }
+        }
+
+        var recursiveStrings: [String] = []
+        if let dataValue = item.rawObject["data"] {
+            collectStrings(from: dataValue, output: &recursiveStrings, limit: 24)
+        }
+        for source in recursiveStrings {
+            if let match = bestFQCNMatch(in: source, shortName: shortName) {
+                return match
+            }
+        }
+
+        return nil
+    }
+
+    private func collectStrings(from value: JSONValue, output: inout [String], limit: Int) {
+        guard output.count < limit else { return }
+        switch value {
+        case let .string(stringValue):
+            let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                output.append(trimmed)
+            }
+        case let .array(values):
+            for item in values {
+                collectStrings(from: item, output: &output, limit: limit)
+                if output.count >= limit { return }
+            }
+        case let .object(object):
+            for (_, item) in object {
+                collectStrings(from: item, output: &output, limit: limit)
+                if output.count >= limit { return }
+            }
+        case .number, .bool, .null:
+            return
+        }
+    }
+
+    private func bestFQCNMatch(in source: String, shortName: String) -> String? {
+        let candidates = extractFQCNCandidates(from: source)
+        guard !candidates.isEmpty else {
+            return nil
+        }
+
+        for candidate in candidates {
+            if candidate.split(separator: "\\").last.map(String.init) == shortName {
+                return candidate
+            }
+        }
+
+        return candidates.first
+    }
+
+    private func extractFQCNCandidates(from source: String) -> [String] {
+        let pattern = #"\\?[A-Za-z_][A-Za-z0-9_]*(?:\\[A-Za-z_][A-Za-z0-9_]*)+"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return []
+        }
+
+        let range = NSRange(location: 0, length: (source as NSString).length)
+        let matches = regex.matches(in: source, options: [], range: range)
+        var results: [String] = []
+        results.reserveCapacity(matches.count)
+        for match in matches {
+            let raw = (source as NSString).substring(with: match.range)
+            let normalized = sanitizeSymbolName(raw)
+            if normalized.contains("\\") {
+                results.append(normalized)
+            }
+        }
+        return results
+    }
+
+    private func makeImportTextEdit(fqcn: String, in sourceText: String) -> CompletionTextEdit? {
+        let normalized = sanitizeSymbolName(fqcn)
+        guard normalized.contains("\\") else {
+            return nil
+        }
+
+        let lines = sourceText.components(separatedBy: "\n")
+        let escapedFQCN = NSRegularExpression.escapedPattern(for: normalized)
+        let existingPattern = #"^\s*use\s+\\?"# + escapedFQCN + #"\s*;\s*$"#
+        if lines.contains(where: { $0.range(of: existingPattern, options: .regularExpression) != nil }) {
+            return nil
+        }
+
+        let namespaceName = currentNamespace(in: lines)
+        if let namespaceName, normalized.hasPrefix(namespaceName + "\\") {
+            return nil
+        }
+
+        var insertIndex = 0
+        if let first = lines.first, first.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<?php") {
+            insertIndex = 1
+        }
+
+        while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            insertIndex += 1
+        }
+
+        if insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("declare(") {
+            insertIndex += 1
+            while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                insertIndex += 1
+            }
+        }
+
+        if insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("namespace ") {
+            insertIndex += 1
+            while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                insertIndex += 1
+            }
+        }
+
+        while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("use ") {
+            insertIndex += 1
+        }
+
+        var newText = "use \(normalized);\n"
+        if insertIndex < lines.count && !lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            newText += "\n"
+        }
+
+        return CompletionTextEdit(
+            startLine: insertIndex,
+            startCharacter: 0,
+            endLine: insertIndex,
+            endCharacter: 0,
+            newText: newText,
+            selectedRangeInNewText: nil
+        )
+    }
+
+    private func currentNamespace(in lines: [String]) -> String? {
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.hasPrefix("namespace ") else { continue }
+            let namespace = trimmed
+                .replacingOccurrences(of: "namespace ", with: "")
+                .replacingOccurrences(of: ";", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = sanitizeSymbolName(namespace)
+            if !normalized.isEmpty {
+                return normalized
+            }
+        }
+        return nil
+    }
+
+    private func sanitizeSymbolName(_ value: String) -> String {
+        var result = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "class ", with: "")
+            .replacingOccurrences(of: "interface ", with: "")
+            .replacingOccurrences(of: "trait ", with: "")
+            .replacingOccurrences(of: "enum ", with: "")
+        while result.hasPrefix("\\") {
+            result.removeFirst()
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func parseCompletionCandidate(
         from object: [String: JSONValue],
         lineOffset: Int,
@@ -911,6 +1232,245 @@ actor PHPLSPService: CompletionProviding {
             newText: resolvedText.text,
             selectedRangeInNewText: resolvedText.selectedRange
         )
+    }
+
+    private func parseDefinitionLocation(from response: JSONValue?) -> SymbolLocation? {
+        guard let response else { return nil }
+
+        if let array = response.arrayValue {
+            for value in array {
+                if let location = parseLocation(from: value) {
+                    return location
+                }
+            }
+            return nil
+        }
+
+        return parseLocation(from: response)
+    }
+
+    private func parseWorkspaceSymbols(from response: JSONValue?) -> [WorkspaceSymbolCandidate] {
+        guard let items = response?.arrayValue else { return [] }
+
+        return items.compactMap { value in
+            guard let object = value.objectValue,
+                  let name = object["name"]?.stringValue,
+                  !name.isEmpty
+            else {
+                return nil
+            }
+
+            let detail = object["detail"]?.stringValue ?? object["containerName"]?.stringValue
+            let kind = object["kind"]?.intValue.flatMap { CompletionItemKind(rawValue: $0) }
+            let location = parseLocation(from: object["location"] ?? value)
+            return WorkspaceSymbolCandidate(
+                name: name,
+                detail: detail,
+                kind: kind,
+                location: location
+            )
+        }
+    }
+
+    private func parseDocumentSymbols(from response: JSONValue?, defaultURI: String) -> [DocumentSymbolCandidate] {
+        guard let items = response?.arrayValue else { return [] }
+
+        var flattened: [DocumentSymbolCandidate] = []
+        for value in items {
+            flattened.append(contentsOf: parseDocumentSymbolNode(value, parentName: nil, defaultURI: defaultURI))
+        }
+        return flattened
+    }
+
+    private func parseDocumentSymbolNode(_ value: JSONValue, parentName: String?, defaultURI: String) -> [DocumentSymbolCandidate] {
+        guard let object = value.objectValue,
+              let name = object["name"]?.stringValue,
+              !name.isEmpty
+        else {
+            return []
+        }
+
+        let kind = object["kind"]?.intValue.flatMap { CompletionItemKind(rawValue: $0) }
+        let detail = object["detail"]?.stringValue ?? object["containerName"]?.stringValue ?? parentName
+        let location = parseLocation(from: object["location"] ?? value)
+            ?? parseRangeLocation(uri: defaultURI, rangeValue: object["selectionRange"] ?? object["range"])
+        var nodes: [DocumentSymbolCandidate] = [
+            DocumentSymbolCandidate(
+                name: name,
+                detail: detail,
+                kind: kind,
+                location: location
+            )
+        ]
+
+        let nextParent = parentName.map { "\($0).\(name)" } ?? name
+        if let children = object["children"]?.arrayValue {
+            for child in children {
+                nodes.append(contentsOf: parseDocumentSymbolNode(child, parentName: nextParent, defaultURI: defaultURI))
+            }
+        }
+        return nodes
+    }
+
+    private func parseLocation(from value: JSONValue?) -> SymbolLocation? {
+        guard let value else { return nil }
+        guard let object = value.objectValue else { return nil }
+
+        if let uri = object["uri"]?.stringValue {
+            return parseRangeLocation(uri: uri, rangeValue: object["range"] ?? object["selectionRange"])
+        }
+
+        if let targetURI = object["targetUri"]?.stringValue {
+            return parseRangeLocation(uri: targetURI, rangeValue: object["targetSelectionRange"] ?? object["targetRange"])
+        }
+
+        if let locationObject = object["location"]?.objectValue {
+            let uri = locationObject["uri"]?.stringValue
+            let range = locationObject["range"] ?? locationObject["selectionRange"]
+            if let uri {
+                return parseRangeLocation(uri: uri, rangeValue: range)
+            }
+        }
+
+        return nil
+    }
+
+    private func parseRangeLocation(uri: String, rangeValue: JSONValue?) -> SymbolLocation? {
+        guard let rangeObject = rangeValue?.objectValue,
+              let start = rangeObject["start"]?.objectValue,
+              let line = start["line"]?.intValue,
+              let character = start["character"]?.intValue
+        else {
+            return nil
+        }
+        return SymbolLocation(uri: uri, line: line, character: character)
+    }
+
+    private func fallbackBuiltinFunctionCompletions(text: String, utf16Offset: Int) async -> [CompletionCandidate] {
+        let rawPrefix = completionPrefix(in: text, utf16Offset: utf16Offset)
+        guard !rawPrefix.isEmpty else { return [] }
+
+        let loweredPrefix = rawPrefix.lowercased()
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\\"))
+        guard loweredPrefix.count >= 2 else { return [] }
+
+        let functions = await phpInternalFunctions()
+        guard !functions.isEmpty else { return [] }
+
+        let matched = functions
+            .filter { $0.hasPrefix(loweredPrefix) }
+            .prefix(80)
+
+        return matched.map { name in
+            CompletionCandidate(
+                id: "php_builtin:\(name)",
+                label: name,
+                detail: "PHP internal function",
+                documentation: nil,
+                sortText: "zz_builtin_\(name)",
+                insertText: "\(name)()",
+                insertSelectionRange: NSRange(location: (name as NSString).length + 1, length: 0),
+                primaryTextEdit: nil,
+                additionalTextEdits: [],
+                kind: .function
+            )
+        }
+    }
+
+    private func completionPrefix(in text: String, utf16Offset: Int) -> String {
+        let nsText = text as NSString
+        let cursor = min(max(0, utf16Offset), nsText.length)
+        guard cursor > 0 else { return "" }
+
+        var start = cursor
+        while start > 0 {
+            let scalar = nsText.character(at: start - 1)
+            if !isTokenCharacter(scalar) {
+                break
+            }
+            start -= 1
+        }
+
+        guard start < cursor else { return "" }
+        return nsText.substring(with: NSRange(location: start, length: cursor - start))
+    }
+
+    private func isTokenCharacter(_ value: unichar) -> Bool {
+        if value == 95 || value == 92 { // _ and \
+            return true
+        }
+        if (48...57).contains(value) {
+            return true
+        }
+        if (65...90).contains(value) {
+            return true
+        }
+        if (97...122).contains(value) {
+            return true
+        }
+        return false
+    }
+
+    private func phpInternalFunctions() async -> [String] {
+        if let cached = builtinPHPFunctions {
+            return cached
+        }
+
+        guard let phpPath = BinaryPathResolver.effectivePath(for: .php) else {
+            builtinPHPFunctions = []
+            return []
+        }
+
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.environment = BinaryPathResolver.processEnvironment()
+        process.executableURL = URL(fileURLWithPath: phpPath)
+        process.arguments = [
+            "-r",
+            "echo json_encode(get_defined_functions()['internal']);"
+        ]
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        do {
+            try await runAndWaitForTermination(process)
+        } catch {
+            builtinPHPFunctions = []
+            return []
+        }
+
+        guard process.terminationStatus == 0 else {
+            builtinPHPFunctions = []
+            return []
+        }
+
+        let outputData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        guard let names = try? JSONDecoder().decode([String].self, from: outputData) else {
+            builtinPHPFunctions = []
+            return []
+        }
+
+        let normalized = names
+            .map { $0.lowercased() }
+            .filter { !$0.isEmpty }
+            .sorted()
+        builtinPHPFunctions = normalized
+        return normalized
+    }
+
+    private func runAndWaitForTermination(_ process: Process) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            process.terminationHandler = { _ in
+                continuation.resume()
+            }
+            do {
+                try process.run()
+            } catch {
+                process.terminationHandler = nil
+                continuation.resume(throwing: error)
+            }
+        }
     }
 
     private func prepareDocumentText(_ sourceText: String) -> LSPPreparedDocument {

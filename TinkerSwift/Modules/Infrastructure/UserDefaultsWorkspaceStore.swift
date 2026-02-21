@@ -10,6 +10,7 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
         static let syntaxHighlighting = "editor.syntaxHighlighting"
         static let lspCompletionEnabled = "editor.lspCompletionEnabled"
         static let lspAutoTriggerEnabled = "editor.lspAutoTriggerEnabled"
+        static let autoFormatOnRunEnabled = "editor.autoFormatOnRunEnabled"
         static let lspServerPathOverride = "editor.lspServerPathOverride"
         static let phpBinaryPathOverride = "binary.php.overridePath"
         static let dockerBinaryPathOverride = "binary.docker.overridePath"
@@ -64,6 +65,7 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
             syntaxHighlighting: defaults.object(forKey: DefaultsKey.syntaxHighlighting) as? Bool ?? true,
             lspCompletionEnabled: defaults.object(forKey: DefaultsKey.lspCompletionEnabled) as? Bool ?? true,
             lspAutoTriggerEnabled: defaults.object(forKey: DefaultsKey.lspAutoTriggerEnabled) as? Bool ?? true,
+            autoFormatOnRunEnabled: defaults.object(forKey: DefaultsKey.autoFormatOnRunEnabled) as? Bool ?? true,
             lspServerPathOverride: defaults.string(forKey: DefaultsKey.lspServerPathOverride) ?? "",
             phpBinaryPathOverride: defaults.string(forKey: DefaultsKey.phpBinaryPathOverride) ?? "",
             dockerBinaryPathOverride: defaults.string(forKey: DefaultsKey.dockerBinaryPathOverride) ?? "",
@@ -137,6 +139,7 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
         defaults.set(settings.syntaxHighlighting, forKey: DefaultsKey.syntaxHighlighting)
         defaults.set(settings.lspCompletionEnabled, forKey: DefaultsKey.lspCompletionEnabled)
         defaults.set(settings.lspAutoTriggerEnabled, forKey: DefaultsKey.lspAutoTriggerEnabled)
+        defaults.set(settings.autoFormatOnRunEnabled, forKey: DefaultsKey.autoFormatOnRunEnabled)
         defaults.set(settings.lspServerPathOverride, forKey: DefaultsKey.lspServerPathOverride)
         defaults.set(settings.phpBinaryPathOverride, forKey: DefaultsKey.phpBinaryPathOverride)
         defaults.set(settings.dockerBinaryPathOverride, forKey: DefaultsKey.dockerBinaryPathOverride)

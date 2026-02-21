@@ -16,6 +16,8 @@ struct AppKitCodeEditor: NSViewRepresentable {
     let lspCompletionEnabled: Bool
     let lspAutoTriggerEnabled: Bool
     let lspServerPathOverride: String
+    let lspLanguageID: String
+    let completionProvider: (any CompletionProviding)?
 
     init(
         text: Binding<String>,
@@ -28,7 +30,9 @@ struct AppKitCodeEditor: NSViewRepresentable {
         projectPath: String = "",
         lspCompletionEnabled: Bool = false,
         lspAutoTriggerEnabled: Bool = true,
-        lspServerPathOverride: String = ""
+        lspServerPathOverride: String = "",
+        lspLanguageID: String = "php",
+        completionProvider: (any CompletionProviding)? = PHPLSPService.shared
     ) {
         _text = text
         self.fontSize = fontSize
@@ -41,10 +45,16 @@ struct AppKitCodeEditor: NSViewRepresentable {
         self.lspCompletionEnabled = lspCompletionEnabled
         self.lspAutoTriggerEnabled = lspAutoTriggerEnabled
         self.lspServerPathOverride = lspServerPathOverride
+        self.lspLanguageID = lspLanguageID
+        self.completionProvider = completionProvider
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
+        Coordinator(
+            text: $text,
+            provider: completionProvider ?? NoopCompletionProvider.shared,
+            languageID: lspLanguageID
+        )
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -86,7 +96,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         context.coordinator.updateVisualState(on: textView, force: true)
         context.coordinator.configureLSP(
             projectPath: projectPath,
-            enabled: isEditable && lspCompletionEnabled,
+            enabled: isEditable && lspCompletionEnabled && completionProvider != nil,
             autoTriggerEnabled: lspAutoTriggerEnabled,
             serverPathOverride: lspServerPathOverride,
             currentText: textView.text ?? ""
@@ -119,7 +129,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         context.coordinator.updateVisualState(on: textView)
         context.coordinator.configureLSP(
             projectPath: projectPath,
-            enabled: isEditable && lspCompletionEnabled,
+            enabled: isEditable && lspCompletionEnabled && completionProvider != nil,
             autoTriggerEnabled: lspAutoTriggerEnabled,
             serverPathOverride: lspServerPathOverride,
             currentText: textView.text ?? ""
@@ -141,11 +151,11 @@ struct AppKitCodeEditor: NSViewRepresentable {
         private var completionPopupFontSize: CGFloat = 12
         private let completionViewController = ScaledCompletionViewController()
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>, provider: any CompletionProviding, languageID: String) {
             _text = text
             completionOrchestrator = EditorCompletionOrchestrator(
-                provider: PHPLSPService.shared,
-                languageID: "php",
+                provider: provider,
+                languageID: languageID,
                 logger: { message in
                     DebugConsoleStore.shared.append(stream: .app, message: "[EditorCompletion] \(message)")
                 }
@@ -430,6 +440,27 @@ struct AppKitCodeEditor: NSViewRepresentable {
     }
 }
 
+private actor NoopCompletionProvider: CompletionProviding {
+    static let shared = NoopCompletionProvider()
+    let languageID = "php"
+
+    func setServerPathOverride(_ value: String) async {}
+
+    func openOrUpdateDocument(uri: String, projectPath: String, text: String, languageID: String) async {}
+
+    func closeDocument(uri: String) async {}
+
+    func completionItems(
+        uri: String,
+        projectPath: String,
+        text: String,
+        utf16Offset: Int,
+        triggerCharacter: String?
+    ) async -> [CompletionCandidate] {
+        []
+    }
+}
+
 fileprivate final class EditorHostScrollView: NSScrollView {
     override var intrinsicContentSize: NSSize {
         NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
@@ -498,6 +529,7 @@ fileprivate final class CodePaneTextView: STTextView {
         }
         center.removeObserver(self, name: NSApplication.didBecomeActiveNotification, object: NSApp)
         center.removeObserver(self, name: NSApplication.didResignActiveNotification, object: NSApp)
+        center.removeObserver(self, name: .tinkerSwiftInsertTextAtCursor, object: nil)
 
         if let window {
             observedWindow = window
@@ -529,11 +561,38 @@ fileprivate final class CodePaneTextView: STTextView {
             name: NSApplication.didResignActiveNotification,
             object: NSApp
         )
+        center.addObserver(
+            self,
+            selector: #selector(handleInsertTextNotification(_:)),
+            name: .tinkerSwiftInsertTextAtCursor,
+            object: nil
+        )
     }
 
     @objc
     private func handleVisualStateNotification(_ notification: Notification) {
         notifyVisualStateChanged()
+    }
+
+    @objc
+    private func handleInsertTextNotification(_ notification: Notification) {
+        guard isEditable else { return }
+        guard let payload = notification.userInfo?["text"] as? String else { return }
+        guard !payload.isEmpty else { return }
+
+        let selectedRange = selectedRange()
+        let replacementRange: NSRange
+        if selectedRange.location == NSNotFound {
+            let currentText = text ?? ""
+            let length = (currentText as NSString).length
+            replacementRange = NSRange(location: length, length: 0)
+        } else {
+            replacementRange = selectedRange
+        }
+
+        replaceCharacters(in: replacementRange, with: payload)
+        let insertedLength = (payload as NSString).length
+        textSelection = NSRange(location: replacementRange.location + insertedLength, length: 0)
     }
 
     private func notifyVisualStateChanged() {
