@@ -31,5 +31,6 @@ targets:
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: TinkerSwift/AppIcon.icon
+        ENABLE_HARDENED_RUNTIME: YES
         PRODUCT_NAME: TinkerSwift
         CODE_SIGN_STYLE: Automatic
