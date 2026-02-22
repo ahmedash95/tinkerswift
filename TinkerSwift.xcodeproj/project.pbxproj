@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -37,6 +37,7 @@
 		D3D4C941638D44660478ABB8 /* STTextView in Frameworks */ = {isa = PBXBuildFile; productRef = D97CADF26E40B2AAF2540EF7 /* STTextView */; };
 		D7C3A8CB527F5229279CB7EC /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B0006A25CE65F698145CFE5 /* ContentView.swift */; };
 		E0B60C731549B126D41B2998 /* TinkerSwiftState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7DB5B6353E7B627FE1D26A7 /* TinkerSwiftState.swift */; };
+		E2F5D8002F4B4250001AD8DC /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = E2F5D7FF2F4B4250001AD8DC /* AppIcon.icon */; };
 		EE0A5FA94C50DDBBA0A7D9BF /* EditorCompletionOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B4AF2768516F01A838E295B /* EditorCompletionOrchestrator.swift */; };
 		F69C4AFA24B6317CCEFC2CC5 /* ReplWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FD787F69751EB1A26F08323 /* ReplWorkspaceView.swift */; };
 		FBFBB20D68250C32D5903E48 /* UserDefaultsWorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9437A2E57D2555C22BCC6897 /* UserDefaultsWorkspaceStore.swift */; };
@@ -45,7 +46,6 @@
 /* Begin PBXFileReference section */
 		089DD620DC65619873282D8D /* ProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessRunner.swift; sourceTree = "<group>"; };
 		0B4AF2768516F01A838E295B /* EditorCompletionOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCompletionOrchestrator.swift; sourceTree = "<group>"; };
-		197A780140CD674D3D057BB7 /* TinkerSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TinkerSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1B0006A25CE65F698145CFE5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2126F5DDD177527BCAC52E0C /* PersistenceContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceContracts.swift; sourceTree = "<group>"; };
 		3A1BA2E73EB7821D4CD15A16 /* CompletionContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionContracts.swift; sourceTree = "<group>"; };
@@ -72,6 +72,8 @@
 		BA49A00672807B78AB9E1BD7 /* WorkspaceExecutionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceExecutionSupport.swift; sourceTree = "<group>"; };
 		CA41881C1CDF7F49F88F2711 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CBC131919D5D01EE74C688C4 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
+		E2F5D7FD2F4B4151001AD8DC /* TinkerSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TinkerSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E2F5D7FF2F4B4250001AD8DC /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		E99EE6EBA5EDDCB524D690D3 /* ResultPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultPaneView.swift; sourceTree = "<group>"; };
 		F186B6B729554AEB916F1710 /* ProjectContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectContracts.swift; sourceTree = "<group>"; };
 		F885E28A3CED0451E7ED5660 /* PHPSymbolImportSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPSymbolImportSupport.swift; sourceTree = "<group>"; };
@@ -118,14 +120,6 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
-		11858D6C0BCDBDDD6AA07C3F /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				197A780140CD674D3D057BB7 /* TinkerSwift.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
 		1FB41D793C932B3622A55CE4 /* Workspace */ = {
 			isa = PBXGroup;
 			children = (
@@ -142,7 +136,8 @@
 			isa = PBXGroup;
 			children = (
 				A07BB4D64935180AAFD86CEB /* TinkerSwift */,
-				11858D6C0BCDBDDD6AA07C3F /* Products */,
+				E2F5D7FE2F4B4151001AD8DC /* Products */,
+				E2F5D7FF2F4B4250001AD8DC /* AppIcon.icon */,
 			);
 			sourceTree = "<group>";
 		};
@@ -224,6 +219,14 @@
 			path = Persistence;
 			sourceTree = "<group>";
 		};
+		E2F5D7FE2F4B4151001AD8DC /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E2F5D7FD2F4B4151001AD8DC /* TinkerSwift.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
 		FBA5CDA08C6BB3CB575AC884 /* Contracts */ = {
 			isa = PBXGroup;
 			children = (
@@ -277,7 +280,7 @@
 				57055A4399366F807072010C /* STTextView-Plugin-Neon */,
 			);
 			productName = TinkerSwift;
-			productReference = 197A780140CD674D3D057BB7 /* TinkerSwift.app */;
+			productReference = E2F5D7FD2F4B4151001AD8DC /* TinkerSwift.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -290,7 +293,6 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					FD82EFD2FEF297E2D35758CB = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -309,7 +311,7 @@
 				6FC744F16C91C11C133070B0 /* XCRemoteSwiftPackageReference "STTextView" */,
 				7DE8D9DB5EE46F5BCF734C97 /* XCRemoteSwiftPackageReference "STTextView-Plugin-Neon" */,
 			);
-			preferredProjectObjectVersion = 77;
+			productRefGroup = E2F5D7FE2F4B4151001AD8DC /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -323,6 +325,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E2F5D8002F4B4250001AD8DC /* AppIcon.icon in Resources */,
 				98012327C79B3EA468725CA7 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -373,14 +376,19 @@
 		473F68D73D7C1B6C2BFFBAA6 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = TinkerSwift/AppIcon.icon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 7CE3E2W6XY;
+				INFOPLIST_KEY_CFBundleDisplayName = TinkerSwift;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_NAME = TinkerSwift;
 				SDKROOT = macosx;
 			};
@@ -389,14 +397,19 @@
 		BBCE30404EA3C4A33663DCB5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = TinkerSwift/AppIcon.icon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 7CE3E2W6XY;
+				INFOPLIST_KEY_CFBundleDisplayName = TinkerSwift;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_NAME = TinkerSwift;
 				SDKROOT = macosx;
 			};
