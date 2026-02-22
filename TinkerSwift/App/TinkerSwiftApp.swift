@@ -67,17 +67,17 @@ private struct TinkerSwiftCommands: Commands {
             Divider()
 
             Button("Zoom In") {
-                appModel.appUIScale = min(appModel.appUIScale + 0.1, 3.0)
+                appModel.appUIScale = UIScaleSanitizer.sanitize(appModel.appUIScale + 0.1)
             }
             .keyboardShortcut("=", modifiers: [.command])
 
             Button("Zoom Out") {
-                appModel.appUIScale = max(appModel.appUIScale - 0.1, 0.6)
+                appModel.appUIScale = UIScaleSanitizer.sanitize(appModel.appUIScale - 0.1)
             }
             .keyboardShortcut("-", modifiers: [.command])
 
             Button("Actual Size") {
-                appModel.appUIScale = 1.0
+                appModel.appUIScale = UIScaleSanitizer.defaultScale
             }
             .keyboardShortcut("0", modifiers: [.command])
         }

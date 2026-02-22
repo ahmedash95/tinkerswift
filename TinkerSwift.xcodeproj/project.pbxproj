@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -22,6 +22,7 @@
 		346F66CC98F91578D07A8C07 /* PHPExecutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C14C57DCA9C0540DCFC1420 /* PHPExecutionService.swift */; };
 		39FABDA2C6C93B87C419991E /* RunHistoryWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D4CC5CAB6A5BF4C78DB4E57 /* RunHistoryWindowView.swift */; };
 		3F1FE015C72C70F7EE46E072 /* WorkspaceExecutionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA49A00672807B78AB9E1BD7 /* WorkspaceExecutionSupport.swift */; };
+		4110EA59E90173991D7934AE /* UIScaleSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2C0758540C37FCD4EDC18F /* UIScaleSanitizer.swift */; };
 		47947BE7290FA3042F31D5B3 /* ResultPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E99EE6EBA5EDDCB524D690D3 /* ResultPaneView.swift */; };
 		555237BAFAC6B1E3E9E01749 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBC131919D5D01EE74C688C4 /* AppContainer.swift */; };
 		5590015B057BBAB4B2B2C8AF /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE15DCC1AAE6AA70EAD2578 /* AppDelegate.swift */; };
@@ -43,10 +44,11 @@
 /* Begin PBXFileReference section */
 		089DD620DC65619873282D8D /* ProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessRunner.swift; sourceTree = "<group>"; };
 		0B4AF2768516F01A838E295B /* EditorCompletionOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCompletionOrchestrator.swift; sourceTree = "<group>"; };
-		197A780140CD674D3D057BB7 /* TinkerSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TinkerSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		197A780140CD674D3D057BB7 /* TinkerSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = TinkerSwift.app; path = "/Users/ahmed/Code/side-projects/tinkerswift/build/Debug/TinkerSwift.app"; sourceTree = "<absolute>"; };
 		1B0006A25CE65F698145CFE5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2126F5DDD177527BCAC52E0C /* PersistenceContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceContracts.swift; sourceTree = "<group>"; };
 		3A1BA2E73EB7821D4CD15A16 /* CompletionContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionContracts.swift; sourceTree = "<group>"; };
+		3E2C0758540C37FCD4EDC18F /* UIScaleSanitizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIScaleSanitizer.swift; sourceTree = "<group>"; };
 		3FD787F69751EB1A26F08323 /* ReplWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplWorkspaceView.swift; sourceTree = "<group>"; };
 		4766E4C5DA28FCAA82DB5D8C /* ExecutionResultPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionResultPresenter.swift; sourceTree = "<group>"; };
 		4EE15DCC1AAE6AA70EAD2578 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -114,14 +116,6 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
-		11858D6C0BCDBDDD6AA07C3F /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				197A780140CD674D3D057BB7 /* TinkerSwift.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
 		1FB41D793C932B3622A55CE4 /* Workspace */ = {
 			isa = PBXGroup;
 			children = (
@@ -138,7 +132,6 @@
 			isa = PBXGroup;
 			children = (
 				A07BB4D64935180AAFD86CEB /* TinkerSwift */,
-				11858D6C0BCDBDDD6AA07C3F /* Products */,
 			);
 			sourceTree = "<group>";
 		};
@@ -155,6 +148,7 @@
 			children = (
 				F885E28A3CED0451E7ED5660 /* PHPSymbolImportSupport.swift */,
 				74BE7DB5DFFE882E4B55BF17 /* TextPositionConverter.swift */,
+				3E2C0758540C37FCD4EDC18F /* UIScaleSanitizer.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -303,7 +297,6 @@
 				6FC744F16C91C11C133070B0 /* XCRemoteSwiftPackageReference "STTextView" */,
 				7DE8D9DB5EE46F5BCF734C97 /* XCRemoteSwiftPackageReference "STTextView-Plugin-Neon" */,
 			);
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -352,6 +345,7 @@
 				0E4E4DB991C47A24C50FD77F /* TextPositionConverter.swift in Sources */,
 				0046D9DC5525FCDE7BBF89B1 /* TinkerSwiftApp.swift in Sources */,
 				E0B60C731549B126D41B2998 /* TinkerSwiftState.swift in Sources */,
+				4110EA59E90173991D7934AE /* UIScaleSanitizer.swift in Sources */,
 				FBFBB20D68250C32D5903E48 /* UserDefaultsWorkspaceStore.swift in Sources */,
 				069B88FDC7F79B121A20CA90 /* WorkspaceDataServices.swift in Sources */,
 				3F1FE015C72C70F7EE46E072 /* WorkspaceExecutionSupport.swift in Sources */,

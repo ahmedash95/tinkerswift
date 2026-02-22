@@ -38,10 +38,6 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
         let executedAt: Date
     }
 
-    private static let minScale = 0.6
-    private static let maxScale = 3.0
-    private static let defaultScale = 1.0
-
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -50,7 +46,7 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
 
     func load() -> WorkspacePersistenceSnapshot {
         let persistedScale = decodeDouble(defaults.object(forKey: DefaultsKey.appUIScale))
-        let normalizedScale = sanitizedScale(persistedScale ?? Self.defaultScale)
+        let normalizedScale = sanitizedScale(persistedScale ?? UIScaleSanitizer.defaultScale)
         if persistedScale == nil || abs((persistedScale ?? normalizedScale) - normalizedScale) > 0.000_001 {
             defaults.set(normalizedScale, forKey: DefaultsKey.appUIScale)
         }
@@ -389,10 +385,7 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
     }
 
     private func sanitizedScale(_ value: Double) -> Double {
-        guard value.isFinite else {
-            return Self.defaultScale
-        }
-        return min(max(value, Self.minScale), Self.maxScale)
+        UIScaleSanitizer.sanitize(value)
     }
 
     private func decodeDouble(_ value: Any?) -> Double? {

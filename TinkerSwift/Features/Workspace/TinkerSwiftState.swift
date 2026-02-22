@@ -35,9 +35,6 @@ enum RawStreamMode: String, CaseIterable {
 @MainActor
 @Observable
 final class AppModel {
-    private static let minScale = 0.6
-    private static let maxScale = 3.0
-    private static let defaultScale = 1.0
     private let persistenceStore: any WorkspacePersistenceStore
     private let projectCatalogService: ProjectCatalogService
     private let runHistoryService: RunHistoryService
@@ -200,10 +197,7 @@ final class AppModel {
     }
 
     private static func sanitizedScale(_ value: Double) -> Double {
-        guard value.isFinite else {
-            return defaultScale
-        }
-        return min(max(value, minScale), maxScale)
+        UIScaleSanitizer.sanitize(value)
     }
 }
 
