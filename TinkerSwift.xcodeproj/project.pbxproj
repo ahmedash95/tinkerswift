@@ -7,64 +7,70 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		010775AB09E90EB72A6C60AC /* EditorPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41FDE6BC6FB49F608A299BB4 /* EditorPaneView.swift */; };
-		04AFEEC03120232C61CD5B87 /* ResultPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 147DD2B832E03877D14035A9 /* ResultPaneView.swift */; };
-		0BB649EE698FA066422C6CCE /* ReplWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C5113908F526D1FF011EA45 /* ReplWorkspaceView.swift */; };
-		1879470A613A90720C382DAB /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8B992ED3FD204C4FE21D7A6 /* AppContainer.swift */; };
-		1E7D3EB22066CF47130B6446 /* TinkerSwiftState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E586EF248F30C2CD75ABA8A7 /* TinkerSwiftState.swift */; };
+		0046D9DC5525FCDE7BBF89B1 /* TinkerSwiftApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B32CD6861A5CE49E9A56D45D /* TinkerSwiftApp.swift */; };
+		0110F09B87AB6EDE49E888F7 /* ProjectSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D43AAD34C975F29FC933829 /* ProjectSidebarView.swift */; };
+		069B88FDC7F79B121A20CA90 /* WorkspaceDataServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D906D78C834B088D694CC31 /* WorkspaceDataServices.swift */; };
+		07BF35E95718AF8389E7C14A /* PersistenceContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2126F5DDD177527BCAC52E0C /* PersistenceContracts.swift */; };
+		08A2E195C8ADC0D61D49E04A /* WorkspaceWindowFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584BDC99B811332EF83715A1 /* WorkspaceWindowFactory.swift */; };
+		0DA9660C00F94AD18C7E6A0A /* AppKitCodeEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CBCB1FAF921EFBA6157963E /* AppKitCodeEditor.swift */; };
+		0E4E4DB991C47A24C50FD77F /* TextPositionConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74BE7DB5DFFE882E4B55BF17 /* TextPositionConverter.swift */; };
+		0FFF5B06167093C7A3CF13DC /* ExecutionResultPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4766E4C5DA28FCAA82DB5D8C /* ExecutionResultPresenter.swift */; };
+		1557B0102FC595A7FACFEA3B /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089DD620DC65619873282D8D /* ProcessRunner.swift */; };
+		166361F2BCACD7C495FB7FCB /* BinaryTooling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D3BABA81E1746CE0A705E1 /* BinaryTooling.swift */; };
+		1CC13C04A6DF229B0B0209C8 /* PHPSymbolImportSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F885E28A3CED0451E7ED5660 /* PHPSymbolImportSupport.swift */; };
 		297DB11570450B821E3973B0 /* STTextView-Plugin-Neon in Frameworks */ = {isa = PBXBuildFile; productRef = 57055A4399366F807072010C /* STTextView-Plugin-Neon */; };
-		36981473333B320BBA96BB55 /* PHPLSPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C687D9F663004CF0CF475B /* PHPLSPService.swift */; };
-		39EDB21842546F84AA60A277 /* RunHistoryWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1E533D6ED25F8AE3EDBFF0 /* RunHistoryWindowView.swift */; };
-		445CC1FD2078345E2201501D /* AppKitCodeEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1DE4774A9619733B2B7024 /* AppKitCodeEditor.swift */; };
-		68BB3A000201CC9F2ED63416 /* EditorCompletionOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CBE9C40054B299725375177 /* EditorCompletionOrchestrator.swift */; };
-		697EA6779AC840D2769642CC /* UserDefaultsWorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62AB739144A5CE2DB078F52B /* UserDefaultsWorkspaceStore.swift */; };
-		7216968CD1B018DC80B8FA4D /* Contracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 322A00600306F00D83FF5C00 /* Contracts.swift */; };
-		85DDAF0FB6FFF116D11287D6 /* PHPExecutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */; };
-		917F845542B9FDBCE23A1635 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2CE3011C05D1288AB735216 /* ContentView.swift */; };
+		346F66CC98F91578D07A8C07 /* PHPExecutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C14C57DCA9C0540DCFC1420 /* PHPExecutionService.swift */; };
+		39FABDA2C6C93B87C419991E /* RunHistoryWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D4CC5CAB6A5BF4C78DB4E57 /* RunHistoryWindowView.swift */; };
+		3F1FE015C72C70F7EE46E072 /* WorkspaceExecutionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA49A00672807B78AB9E1BD7 /* WorkspaceExecutionSupport.swift */; };
+		47947BE7290FA3042F31D5B3 /* ResultPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E99EE6EBA5EDDCB524D690D3 /* ResultPaneView.swift */; };
+		555237BAFAC6B1E3E9E01749 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBC131919D5D01EE74C688C4 /* AppContainer.swift */; };
+		5590015B057BBAB4B2B2C8AF /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE15DCC1AAE6AA70EAD2578 /* AppDelegate.swift */; };
+		66D524494787D2E6E5E80D19 /* ProjectContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F186B6B729554AEB916F1710 /* ProjectContracts.swift */; };
+		70E590EC7C4919DEBEA63AFC /* CompletionContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A1BA2E73EB7821D4CD15A16 /* CompletionContracts.swift */; };
 		98012327C79B3EA468725CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CA41881C1CDF7F49F88F2711 /* Assets.xcassets */; };
-		99017869037F7E3C14147365 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 681EE17BA70F9CAE63E1797F /* SettingsView.swift */; };
-		B1C29B9E5FB3E66BAA809905 /* ProjectSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1EC35E5E2B4AD47E6CD99B1 /* ProjectSidebarView.swift */; };
-		B85F1EDE59E92E574BB3F1D0 /* WorkspaceExecutionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3E43CD8DFF53B5279D6FC3E /* WorkspaceExecutionSupport.swift */; };
-		BA502650190E9270297CCBC3 /* ExecutionResultPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26BA1F3FC438294165BDAC4 /* ExecutionResultPresenter.swift */; };
-		C338FBCD96C17F1B129E68D7 /* PHPSymbolImportSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C802EBF6C07C1051C6C5368E /* PHPSymbolImportSupport.swift */; };
+		BCC209C765789CB876DEAC2C /* PHPLSPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00152DBDC01E4EC663FBAB7 /* PHPLSPService.swift */; };
+		C5532CACA1E938690EBB8AA1 /* EditorPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65B6D667727B2C8DB722E66B /* EditorPaneView.swift */; };
+		CF2DAD6E384058C995D5407B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8C17DE50D7A125B7092F73 /* SettingsView.swift */; };
+		D2E090BC25C85298684DE6E7 /* ExecutionContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A1C812C6F9FB155B98A817 /* ExecutionContracts.swift */; };
 		D3D4C941638D44660478ABB8 /* STTextView in Frameworks */ = {isa = PBXBuildFile; productRef = D97CADF26E40B2AAF2540EF7 /* STTextView */; };
-		D77CB2CA91C6B2466388DDA9 /* TinkerSwiftApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7C47FE7E31C32BEEF95CB4 /* TinkerSwiftApp.swift */; };
-		DB43EA2B51083EEFDDD0D878 /* TextPositionConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4CA240FAEDDC01ED58752C /* TextPositionConverter.swift */; };
-		E5BFC27A630BCDE87162912E /* WorkspaceWindowFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20CA221126C370AB32A0D91 /* WorkspaceWindowFactory.swift */; };
-		F42B6ACA59ADA59B7FC7591F /* BinaryTooling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A8F2109149302AAB09E523 /* BinaryTooling.swift */; };
-		F8D30EA823D888BDF36FA4E8 /* WorkspaceDataServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474CA6B0C2F76BB1053EF325 /* WorkspaceDataServices.swift */; };
-		FBF92F6B0DD066AD137046F3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0FFC7EED87D1C94F2A0A3BA /* AppDelegate.swift */; };
-		FDAF8FC089475AB7DDB1A267 /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 633E981F537CECA7DBDA9B0B /* ProcessRunner.swift */; };
+		D7C3A8CB527F5229279CB7EC /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B0006A25CE65F698145CFE5 /* ContentView.swift */; };
+		E0B60C731549B126D41B2998 /* TinkerSwiftState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7DB5B6353E7B627FE1D26A7 /* TinkerSwiftState.swift */; };
+		EE0A5FA94C50DDBBA0A7D9BF /* EditorCompletionOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B4AF2768516F01A838E295B /* EditorCompletionOrchestrator.swift */; };
+		F69C4AFA24B6317CCEFC2CC5 /* ReplWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FD787F69751EB1A26F08323 /* ReplWorkspaceView.swift */; };
+		FBFBB20D68250C32D5903E48 /* UserDefaultsWorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9437A2E57D2555C22BCC6897 /* UserDefaultsWorkspaceStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		147DD2B832E03877D14035A9 /* ResultPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultPaneView.swift; sourceTree = "<group>"; };
+		089DD620DC65619873282D8D /* ProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessRunner.swift; sourceTree = "<group>"; };
+		0B4AF2768516F01A838E295B /* EditorCompletionOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCompletionOrchestrator.swift; sourceTree = "<group>"; };
 		197A780140CD674D3D057BB7 /* TinkerSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TinkerSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		2C5113908F526D1FF011EA45 /* ReplWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplWorkspaceView.swift; sourceTree = "<group>"; };
-		322A00600306F00D83FF5C00 /* Contracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Contracts.swift; sourceTree = "<group>"; };
-		41FDE6BC6FB49F608A299BB4 /* EditorPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorPaneView.swift; sourceTree = "<group>"; };
-		474CA6B0C2F76BB1053EF325 /* WorkspaceDataServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceDataServices.swift; sourceTree = "<group>"; };
-		4A4CA240FAEDDC01ED58752C /* TextPositionConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextPositionConverter.swift; sourceTree = "<group>"; };
-		62AB739144A5CE2DB078F52B /* UserDefaultsWorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsWorkspaceStore.swift; sourceTree = "<group>"; };
-		633E981F537CECA7DBDA9B0B /* ProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessRunner.swift; sourceTree = "<group>"; };
-		681EE17BA70F9CAE63E1797F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		81A8F2109149302AAB09E523 /* BinaryTooling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BinaryTooling.swift; sourceTree = "<group>"; };
-		9CBE9C40054B299725375177 /* EditorCompletionOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCompletionOrchestrator.swift; sourceTree = "<group>"; };
-		9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPExecutionService.swift; sourceTree = "<group>"; };
-		A1EC35E5E2B4AD47E6CD99B1 /* ProjectSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectSidebarView.swift; sourceTree = "<group>"; };
-		A20CA221126C370AB32A0D91 /* WorkspaceWindowFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceWindowFactory.swift; sourceTree = "<group>"; };
-		A3E43CD8DFF53B5279D6FC3E /* WorkspaceExecutionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceExecutionSupport.swift; sourceTree = "<group>"; };
-		B26BA1F3FC438294165BDAC4 /* ExecutionResultPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionResultPresenter.swift; sourceTree = "<group>"; };
-		BE1DE4774A9619733B2B7024 /* AppKitCodeEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitCodeEditor.swift; sourceTree = "<group>"; };
-		C2CE3011C05D1288AB735216 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		C802EBF6C07C1051C6C5368E /* PHPSymbolImportSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPSymbolImportSupport.swift; sourceTree = "<group>"; };
+		1B0006A25CE65F698145CFE5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		2126F5DDD177527BCAC52E0C /* PersistenceContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceContracts.swift; sourceTree = "<group>"; };
+		3A1BA2E73EB7821D4CD15A16 /* CompletionContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionContracts.swift; sourceTree = "<group>"; };
+		3FD787F69751EB1A26F08323 /* ReplWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplWorkspaceView.swift; sourceTree = "<group>"; };
+		4766E4C5DA28FCAA82DB5D8C /* ExecutionResultPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionResultPresenter.swift; sourceTree = "<group>"; };
+		4EE15DCC1AAE6AA70EAD2578 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		584BDC99B811332EF83715A1 /* WorkspaceWindowFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceWindowFactory.swift; sourceTree = "<group>"; };
+		65B6D667727B2C8DB722E66B /* EditorPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorPaneView.swift; sourceTree = "<group>"; };
+		6C14C57DCA9C0540DCFC1420 /* PHPExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPExecutionService.swift; sourceTree = "<group>"; };
+		74BE7DB5DFFE882E4B55BF17 /* TextPositionConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextPositionConverter.swift; sourceTree = "<group>"; };
+		7D43AAD34C975F29FC933829 /* ProjectSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectSidebarView.swift; sourceTree = "<group>"; };
+		7D4CC5CAB6A5BF4C78DB4E57 /* RunHistoryWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunHistoryWindowView.swift; sourceTree = "<group>"; };
+		80D3BABA81E1746CE0A705E1 /* BinaryTooling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BinaryTooling.swift; sourceTree = "<group>"; };
+		8CBCB1FAF921EFBA6157963E /* AppKitCodeEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitCodeEditor.swift; sourceTree = "<group>"; };
+		9437A2E57D2555C22BCC6897 /* UserDefaultsWorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsWorkspaceStore.swift; sourceTree = "<group>"; };
+		9D906D78C834B088D694CC31 /* WorkspaceDataServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceDataServices.swift; sourceTree = "<group>"; };
+		A00152DBDC01E4EC663FBAB7 /* PHPLSPService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPLSPService.swift; sourceTree = "<group>"; };
+		A7A1C812C6F9FB155B98A817 /* ExecutionContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionContracts.swift; sourceTree = "<group>"; };
+		AB8C17DE50D7A125B7092F73 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B32CD6861A5CE49E9A56D45D /* TinkerSwiftApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TinkerSwiftApp.swift; sourceTree = "<group>"; };
+		B7DB5B6353E7B627FE1D26A7 /* TinkerSwiftState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TinkerSwiftState.swift; sourceTree = "<group>"; };
+		BA49A00672807B78AB9E1BD7 /* WorkspaceExecutionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceExecutionSupport.swift; sourceTree = "<group>"; };
 		CA41881C1CDF7F49F88F2711 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		D8B992ED3FD204C4FE21D7A6 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
-		DD1E533D6ED25F8AE3EDBFF0 /* RunHistoryWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunHistoryWindowView.swift; sourceTree = "<group>"; };
-		E0FFC7EED87D1C94F2A0A3BA /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		E586EF248F30C2CD75ABA8A7 /* TinkerSwiftState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TinkerSwiftState.swift; sourceTree = "<group>"; };
-		F9C687D9F663004CF0CF475B /* PHPLSPService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPLSPService.swift; sourceTree = "<group>"; };
-		FA7C47FE7E31C32BEEF95CB4 /* TinkerSwiftApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TinkerSwiftApp.swift; sourceTree = "<group>"; };
+		CBC131919D5D01EE74C688C4 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
+		E99EE6EBA5EDDCB524D690D3 /* ResultPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultPaneView.swift; sourceTree = "<group>"; };
+		F186B6B729554AEB916F1710 /* ProjectContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectContracts.swift; sourceTree = "<group>"; };
+		F885E28A3CED0451E7ED5660 /* PHPSymbolImportSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPSymbolImportSupport.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,6 +86,34 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		05CF7F7D70BDBDDF526788EB /* LSP */ = {
+			isa = PBXGroup;
+			children = (
+				0B4AF2768516F01A838E295B /* EditorCompletionOrchestrator.swift */,
+				A00152DBDC01E4EC663FBAB7 /* PHPLSPService.swift */,
+			);
+			path = LSP;
+			sourceTree = "<group>";
+		};
+		0B524D20E9D754B19C5492B6 /* Environment */ = {
+			isa = PBXGroup;
+			children = (
+				80D3BABA81E1746CE0A705E1 /* BinaryTooling.swift */,
+				089DD620DC65619873282D8D /* ProcessRunner.swift */,
+			);
+			path = Environment;
+			sourceTree = "<group>";
+		};
+		0E3BF9DA8743E67376681257 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				0B524D20E9D754B19C5492B6 /* Environment */,
+				05CF7F7D70BDBDDF526788EB /* LSP */,
+				E2C34DCBEBAF2535F90DB17A /* Persistence */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
 		11858D6C0BCDBDDD6AA07C3F /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -88,15 +122,16 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		17291E00761A8EFCAF92229A /* Modules */ = {
+		1FB41D793C932B3622A55CE4 /* Workspace */ = {
 			isa = PBXGroup;
 			children = (
-				C4B7B208D44A84566037E5BF /* Application */,
-				493FA217A32F8C3E2848755E /* CoreContracts */,
-				B1C6D8BF2DBBC660BE62A3D4 /* Infrastructure */,
-				6F9A848BC01E6461B56E5E4A /* PluginSystem */,
+				1B0006A25CE65F698145CFE5 /* ContentView.swift */,
+				3FD787F69751EB1A26F08323 /* ReplWorkspaceView.swift */,
+				7D4CC5CAB6A5BF4C78DB4E57 /* RunHistoryWindowView.swift */,
+				B7DB5B6353E7B627FE1D26A7 /* TinkerSwiftState.swift */,
+				9D906D78C834B088D694CC31 /* WorkspaceDataServices.swift */,
 			);
-			path = Modules;
+			path = Workspace;
 			sourceTree = "<group>";
 		};
 		290BD5B7E053054597D930C7 = {
@@ -107,82 +142,112 @@
 			);
 			sourceTree = "<group>";
 		};
-		46718E352D49812C3EE86757 /* State */ = {
+		344A204DA046541479FA6193 /* Projects */ = {
 			isa = PBXGroup;
 			children = (
-				E586EF248F30C2CD75ABA8A7 /* TinkerSwiftState.swift */,
+				7D43AAD34C975F29FC933829 /* ProjectSidebarView.swift */,
 			);
-			path = State;
+			path = Projects;
 			sourceTree = "<group>";
 		};
-		493FA217A32F8C3E2848755E /* CoreContracts */ = {
+		35165F5D3226BDAB14462568 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
-				322A00600306F00D83FF5C00 /* Contracts.swift */,
-				4A4CA240FAEDDC01ED58752C /* TextPositionConverter.swift */,
+				F885E28A3CED0451E7ED5660 /* PHPSymbolImportSupport.swift */,
+				74BE7DB5DFFE882E4B55BF17 /* TextPositionConverter.swift */,
 			);
-			path = CoreContracts;
+			path = Utilities;
 			sourceTree = "<group>";
 		};
-		6F9A848BC01E6461B56E5E4A /* PluginSystem */ = {
+		7841D4885FBD365C3C3C3820 /* Editor */ = {
 			isa = PBXGroup;
 			children = (
-				F9C687D9F663004CF0CF475B /* PHPLSPService.swift */,
+				8CBCB1FAF921EFBA6157963E /* AppKitCodeEditor.swift */,
+				65B6D667727B2C8DB722E66B /* EditorPaneView.swift */,
 			);
-			path = PluginSystem;
+			path = Editor;
+			sourceTree = "<group>";
+		};
+		81FA2D7345073813671B1182 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				AB8C17DE50D7A125B7092F73 /* SettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 		A07BB4D64935180AAFD86CEB /* TinkerSwift */ = {
 			isa = PBXGroup;
 			children = (
-				E0FFC7EED87D1C94F2A0A3BA /* AppDelegate.swift */,
 				CA41881C1CDF7F49F88F2711 /* Assets.xcassets */,
-				C2CE3011C05D1288AB735216 /* ContentView.swift */,
-				B26BA1F3FC438294165BDAC4 /* ExecutionResultPresenter.swift */,
-				9F7D28B80DC43F89D98EFEBB /* PHPExecutionService.swift */,
-				681EE17BA70F9CAE63E1797F /* SettingsView.swift */,
-				FA7C47FE7E31C32BEEF95CB4 /* TinkerSwiftApp.swift */,
-				A20CA221126C370AB32A0D91 /* WorkspaceWindowFactory.swift */,
-				17291E00761A8EFCAF92229A /* Modules */,
-				46718E352D49812C3EE86757 /* State */,
-				A14755A640BD23A122BE1A5E /* Views */,
+				FE03955B451179088930D78F /* App */,
+				FFEDC8B46310C8D16535A088 /* Core */,
+				A2E1664217AB7094BF59BD4A /* Features */,
+				0E3BF9DA8743E67376681257 /* Services */,
 			);
 			path = TinkerSwift;
 			sourceTree = "<group>";
 		};
-		A14755A640BD23A122BE1A5E /* Views */ = {
+		A2E1664217AB7094BF59BD4A /* Features */ = {
 			isa = PBXGroup;
 			children = (
-				BE1DE4774A9619733B2B7024 /* AppKitCodeEditor.swift */,
-				41FDE6BC6FB49F608A299BB4 /* EditorPaneView.swift */,
-				A1EC35E5E2B4AD47E6CD99B1 /* ProjectSidebarView.swift */,
-				2C5113908F526D1FF011EA45 /* ReplWorkspaceView.swift */,
-				147DD2B832E03877D14035A9 /* ResultPaneView.swift */,
-				DD1E533D6ED25F8AE3EDBFF0 /* RunHistoryWindowView.swift */,
+				7841D4885FBD365C3C3C3820 /* Editor */,
+				D498751DF378E6BC75E08E88 /* Execution */,
+				344A204DA046541479FA6193 /* Projects */,
+				81FA2D7345073813671B1182 /* Settings */,
+				1FB41D793C932B3622A55CE4 /* Workspace */,
 			);
-			path = Views;
+			path = Features;
 			sourceTree = "<group>";
 		};
-		B1C6D8BF2DBBC660BE62A3D4 /* Infrastructure */ = {
+		D498751DF378E6BC75E08E88 /* Execution */ = {
 			isa = PBXGroup;
 			children = (
-				81A8F2109149302AAB09E523 /* BinaryTooling.swift */,
-				633E981F537CECA7DBDA9B0B /* ProcessRunner.swift */,
-				62AB739144A5CE2DB078F52B /* UserDefaultsWorkspaceStore.swift */,
+				4766E4C5DA28FCAA82DB5D8C /* ExecutionResultPresenter.swift */,
+				6C14C57DCA9C0540DCFC1420 /* PHPExecutionService.swift */,
+				E99EE6EBA5EDDCB524D690D3 /* ResultPaneView.swift */,
+				BA49A00672807B78AB9E1BD7 /* WorkspaceExecutionSupport.swift */,
 			);
-			path = Infrastructure;
+			path = Execution;
 			sourceTree = "<group>";
 		};
-		C4B7B208D44A84566037E5BF /* Application */ = {
+		E2C34DCBEBAF2535F90DB17A /* Persistence */ = {
 			isa = PBXGroup;
 			children = (
-				D8B992ED3FD204C4FE21D7A6 /* AppContainer.swift */,
-				9CBE9C40054B299725375177 /* EditorCompletionOrchestrator.swift */,
-				C802EBF6C07C1051C6C5368E /* PHPSymbolImportSupport.swift */,
-				474CA6B0C2F76BB1053EF325 /* WorkspaceDataServices.swift */,
-				A3E43CD8DFF53B5279D6FC3E /* WorkspaceExecutionSupport.swift */,
+				9437A2E57D2555C22BCC6897 /* UserDefaultsWorkspaceStore.swift */,
 			);
-			path = Application;
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		FBA5CDA08C6BB3CB575AC884 /* Contracts */ = {
+			isa = PBXGroup;
+			children = (
+				3A1BA2E73EB7821D4CD15A16 /* CompletionContracts.swift */,
+				A7A1C812C6F9FB155B98A817 /* ExecutionContracts.swift */,
+				2126F5DDD177527BCAC52E0C /* PersistenceContracts.swift */,
+				F186B6B729554AEB916F1710 /* ProjectContracts.swift */,
+			);
+			path = Contracts;
+			sourceTree = "<group>";
+		};
+		FE03955B451179088930D78F /* App */ = {
+			isa = PBXGroup;
+			children = (
+				CBC131919D5D01EE74C688C4 /* AppContainer.swift */,
+				4EE15DCC1AAE6AA70EAD2578 /* AppDelegate.swift */,
+				B32CD6861A5CE49E9A56D45D /* TinkerSwiftApp.swift */,
+				584BDC99B811332EF83715A1 /* WorkspaceWindowFactory.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		FFEDC8B46310C8D16535A088 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				FBA5CDA08C6BB3CB575AC884 /* Contracts */,
+				35165F5D3226BDAB14462568 /* Utilities */,
+			);
+			path = Core;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -263,31 +328,34 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1879470A613A90720C382DAB /* AppContainer.swift in Sources */,
-				FBF92F6B0DD066AD137046F3 /* AppDelegate.swift in Sources */,
-				445CC1FD2078345E2201501D /* AppKitCodeEditor.swift in Sources */,
-				F42B6ACA59ADA59B7FC7591F /* BinaryTooling.swift in Sources */,
-				917F845542B9FDBCE23A1635 /* ContentView.swift in Sources */,
-				7216968CD1B018DC80B8FA4D /* Contracts.swift in Sources */,
-				68BB3A000201CC9F2ED63416 /* EditorCompletionOrchestrator.swift in Sources */,
-				010775AB09E90EB72A6C60AC /* EditorPaneView.swift in Sources */,
-				BA502650190E9270297CCBC3 /* ExecutionResultPresenter.swift in Sources */,
-				85DDAF0FB6FFF116D11287D6 /* PHPExecutionService.swift in Sources */,
-				36981473333B320BBA96BB55 /* PHPLSPService.swift in Sources */,
-				C338FBCD96C17F1B129E68D7 /* PHPSymbolImportSupport.swift in Sources */,
-				FDAF8FC089475AB7DDB1A267 /* ProcessRunner.swift in Sources */,
-				B1C29B9E5FB3E66BAA809905 /* ProjectSidebarView.swift in Sources */,
-				0BB649EE698FA066422C6CCE /* ReplWorkspaceView.swift in Sources */,
-				04AFEEC03120232C61CD5B87 /* ResultPaneView.swift in Sources */,
-				39EDB21842546F84AA60A277 /* RunHistoryWindowView.swift in Sources */,
-				99017869037F7E3C14147365 /* SettingsView.swift in Sources */,
-				DB43EA2B51083EEFDDD0D878 /* TextPositionConverter.swift in Sources */,
-				D77CB2CA91C6B2466388DDA9 /* TinkerSwiftApp.swift in Sources */,
-				1E7D3EB22066CF47130B6446 /* TinkerSwiftState.swift in Sources */,
-				697EA6779AC840D2769642CC /* UserDefaultsWorkspaceStore.swift in Sources */,
-				F8D30EA823D888BDF36FA4E8 /* WorkspaceDataServices.swift in Sources */,
-				B85F1EDE59E92E574BB3F1D0 /* WorkspaceExecutionSupport.swift in Sources */,
-				E5BFC27A630BCDE87162912E /* WorkspaceWindowFactory.swift in Sources */,
+				555237BAFAC6B1E3E9E01749 /* AppContainer.swift in Sources */,
+				5590015B057BBAB4B2B2C8AF /* AppDelegate.swift in Sources */,
+				0DA9660C00F94AD18C7E6A0A /* AppKitCodeEditor.swift in Sources */,
+				166361F2BCACD7C495FB7FCB /* BinaryTooling.swift in Sources */,
+				70E590EC7C4919DEBEA63AFC /* CompletionContracts.swift in Sources */,
+				D7C3A8CB527F5229279CB7EC /* ContentView.swift in Sources */,
+				EE0A5FA94C50DDBBA0A7D9BF /* EditorCompletionOrchestrator.swift in Sources */,
+				C5532CACA1E938690EBB8AA1 /* EditorPaneView.swift in Sources */,
+				D2E090BC25C85298684DE6E7 /* ExecutionContracts.swift in Sources */,
+				0FFF5B06167093C7A3CF13DC /* ExecutionResultPresenter.swift in Sources */,
+				346F66CC98F91578D07A8C07 /* PHPExecutionService.swift in Sources */,
+				BCC209C765789CB876DEAC2C /* PHPLSPService.swift in Sources */,
+				1CC13C04A6DF229B0B0209C8 /* PHPSymbolImportSupport.swift in Sources */,
+				07BF35E95718AF8389E7C14A /* PersistenceContracts.swift in Sources */,
+				1557B0102FC595A7FACFEA3B /* ProcessRunner.swift in Sources */,
+				66D524494787D2E6E5E80D19 /* ProjectContracts.swift in Sources */,
+				0110F09B87AB6EDE49E888F7 /* ProjectSidebarView.swift in Sources */,
+				F69C4AFA24B6317CCEFC2CC5 /* ReplWorkspaceView.swift in Sources */,
+				47947BE7290FA3042F31D5B3 /* ResultPaneView.swift in Sources */,
+				39FABDA2C6C93B87C419991E /* RunHistoryWindowView.swift in Sources */,
+				CF2DAD6E384058C995D5407B /* SettingsView.swift in Sources */,
+				0E4E4DB991C47A24C50FD77F /* TextPositionConverter.swift in Sources */,
+				0046D9DC5525FCDE7BBF89B1 /* TinkerSwiftApp.swift in Sources */,
+				E0B60C731549B126D41B2998 /* TinkerSwiftState.swift in Sources */,
+				FBFBB20D68250C32D5903E48 /* UserDefaultsWorkspaceStore.swift in Sources */,
+				069B88FDC7F79B121A20CA90 /* WorkspaceDataServices.swift in Sources */,
+				3F1FE015C72C70F7EE46E072 /* WorkspaceExecutionSupport.swift in Sources */,
+				08A2E195C8ADC0D61D49E04A /* WorkspaceWindowFactory.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
