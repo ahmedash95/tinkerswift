@@ -2,6 +2,7 @@ import Foundation
 
 struct AppSettings: Sendable {
     var appUIScale: Double
+    var hasCompletedOnboarding: Bool
     var showLineNumbers: Bool
     var wrapLines: Bool
     var highlightSelectedLine: Bool

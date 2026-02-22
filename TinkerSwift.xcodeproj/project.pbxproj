@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -19,6 +19,7 @@
 		166361F2BCACD7C495FB7FCB /* BinaryTooling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D3BABA81E1746CE0A705E1 /* BinaryTooling.swift */; };
 		1CC13C04A6DF229B0B0209C8 /* PHPSymbolImportSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F885E28A3CED0451E7ED5660 /* PHPSymbolImportSupport.swift */; };
 		297DB11570450B821E3973B0 /* STTextView-Plugin-Neon in Frameworks */ = {isa = PBXBuildFile; productRef = 57055A4399366F807072010C /* STTextView-Plugin-Neon */; };
+		2C4E8378FD180E7145A7AEF5 /* OnboardingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9970863E634F848DBE2C6D5E /* OnboardingSheet.swift */; };
 		346F66CC98F91578D07A8C07 /* PHPExecutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C14C57DCA9C0540DCFC1420 /* PHPExecutionService.swift */; };
 		39FABDA2C6C93B87C419991E /* RunHistoryWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D4CC5CAB6A5BF4C78DB4E57 /* RunHistoryWindowView.swift */; };
 		3F1FE015C72C70F7EE46E072 /* WorkspaceExecutionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA49A00672807B78AB9E1BD7 /* WorkspaceExecutionSupport.swift */; };
@@ -44,7 +45,7 @@
 /* Begin PBXFileReference section */
 		089DD620DC65619873282D8D /* ProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessRunner.swift; sourceTree = "<group>"; };
 		0B4AF2768516F01A838E295B /* EditorCompletionOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCompletionOrchestrator.swift; sourceTree = "<group>"; };
-		197A780140CD674D3D057BB7 /* TinkerSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = TinkerSwift.app; path = "/Users/ahmed/Code/side-projects/tinkerswift/build/Debug/TinkerSwift.app"; sourceTree = "<absolute>"; };
+		197A780140CD674D3D057BB7 /* TinkerSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TinkerSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1B0006A25CE65F698145CFE5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2126F5DDD177527BCAC52E0C /* PersistenceContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceContracts.swift; sourceTree = "<group>"; };
 		3A1BA2E73EB7821D4CD15A16 /* CompletionContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionContracts.swift; sourceTree = "<group>"; };
@@ -61,6 +62,7 @@
 		80D3BABA81E1746CE0A705E1 /* BinaryTooling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BinaryTooling.swift; sourceTree = "<group>"; };
 		8CBCB1FAF921EFBA6157963E /* AppKitCodeEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitCodeEditor.swift; sourceTree = "<group>"; };
 		9437A2E57D2555C22BCC6897 /* UserDefaultsWorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsWorkspaceStore.swift; sourceTree = "<group>"; };
+		9970863E634F848DBE2C6D5E /* OnboardingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSheet.swift; sourceTree = "<group>"; };
 		9D906D78C834B088D694CC31 /* WorkspaceDataServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceDataServices.swift; sourceTree = "<group>"; };
 		A00152DBDC01E4EC663FBAB7 /* PHPLSPService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPLSPService.swift; sourceTree = "<group>"; };
 		A7A1C812C6F9FB155B98A817 /* ExecutionContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionContracts.swift; sourceTree = "<group>"; };
@@ -116,6 +118,14 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
+		11858D6C0BCDBDDD6AA07C3F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				197A780140CD674D3D057BB7 /* TinkerSwift.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
 		1FB41D793C932B3622A55CE4 /* Workspace */ = {
 			isa = PBXGroup;
 			children = (
@@ -132,6 +142,7 @@
 			isa = PBXGroup;
 			children = (
 				A07BB4D64935180AAFD86CEB /* TinkerSwift */,
+				11858D6C0BCDBDDD6AA07C3F /* Products */,
 			);
 			sourceTree = "<group>";
 		};
@@ -229,6 +240,7 @@
 			children = (
 				CBC131919D5D01EE74C688C4 /* AppContainer.swift */,
 				4EE15DCC1AAE6AA70EAD2578 /* AppDelegate.swift */,
+				9970863E634F848DBE2C6D5E /* OnboardingSheet.swift */,
 				B32CD6861A5CE49E9A56D45D /* TinkerSwiftApp.swift */,
 				584BDC99B811332EF83715A1 /* WorkspaceWindowFactory.swift */,
 			);
@@ -297,6 +309,7 @@
 				6FC744F16C91C11C133070B0 /* XCRemoteSwiftPackageReference "STTextView" */,
 				7DE8D9DB5EE46F5BCF734C97 /* XCRemoteSwiftPackageReference "STTextView-Plugin-Neon" */,
 			);
+			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -331,6 +344,7 @@
 				C5532CACA1E938690EBB8AA1 /* EditorPaneView.swift in Sources */,
 				D2E090BC25C85298684DE6E7 /* ExecutionContracts.swift in Sources */,
 				0FFF5B06167093C7A3CF13DC /* ExecutionResultPresenter.swift in Sources */,
+				2C4E8378FD180E7145A7AEF5 /* OnboardingSheet.swift in Sources */,
 				346F66CC98F91578D07A8C07 /* PHPExecutionService.swift in Sources */,
 				BCC209C765789CB876DEAC2C /* PHPLSPService.swift in Sources */,
 				1CC13C04A6DF229B0B0209C8 /* PHPSymbolImportSupport.swift in Sources */,

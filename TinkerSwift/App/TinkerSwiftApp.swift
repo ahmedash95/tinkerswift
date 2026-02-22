@@ -108,6 +108,7 @@ private struct TinkerSwiftCommands: Commands {
 struct WorkspaceRootView: View {
     private let appModel: AppModel
     @State private var workspaceState: WorkspaceState
+    @State private var isShowingOnboarding = false
 
     init(appModel: AppModel) {
         self.appModel = appModel
@@ -123,6 +124,21 @@ struct WorkspaceRootView: View {
         ContentView()
             .environment(appModel)
             .environment(workspaceState)
+            .sheet(isPresented: $isShowingOnboarding) {
+                OnboardingSheet(isPresented: $isShowingOnboarding)
+                    .environment(appModel)
+                    .environment(workspaceState)
+            }
+            .onAppear {
+                if !appModel.hasCompletedOnboarding {
+                    isShowingOnboarding = true
+                }
+            }
+            .onChange(of: appModel.hasCompletedOnboarding) { _, completed in
+                if completed {
+                    isShowingOnboarding = false
+                }
+            }
     }
 }
 

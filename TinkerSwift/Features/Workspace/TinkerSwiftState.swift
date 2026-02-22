@@ -52,6 +52,10 @@ final class AppModel {
         }
     }
 
+    var hasCompletedOnboarding: Bool {
+        didSet { persistSettings() }
+    }
+
     var showLineNumbers: Bool {
         didSet { persistSettings() }
     }
@@ -122,6 +126,7 @@ final class AppModel {
         let snapshot = persistenceStore.load()
         let selectedProjectID = snapshot.selectedProjectID.trimmingCharacters(in: .whitespacesAndNewlines)
         appUIScale = Self.sanitizedScale(snapshot.settings.appUIScale)
+        hasCompletedOnboarding = snapshot.settings.hasCompletedOnboarding
         showLineNumbers = snapshot.settings.showLineNumbers
         wrapLines = snapshot.settings.wrapLines
         highlightSelectedLine = snapshot.settings.highlightSelectedLine
@@ -181,6 +186,7 @@ final class AppModel {
         persistenceStore.save(
             settings: AppSettings(
                 appUIScale: appUIScale,
+                hasCompletedOnboarding: hasCompletedOnboarding,
                 showLineNumbers: showLineNumbers,
                 wrapLines: wrapLines,
                 highlightSelectedLine: highlightSelectedLine,
@@ -556,6 +562,10 @@ return $users->toJson();
 
     var canShowSymbolSearch: Bool {
         effectiveLSPCompletionEnabled
+    }
+
+    var isDefaultLaravelProjectInstalled: Bool {
+        isLaravelProjectAvailable(at: defaultProject.path)
     }
 
     var showWorkspaceSymbolSearchFromShortcut: (() -> Void)? {
@@ -1053,6 +1063,11 @@ return $users->toJson();
     }
 
     private func evaluateDefaultProjectSelection(showPromptIfMissing: Bool) {
+        guard appModel.hasCompletedOnboarding else {
+            isShowingDefaultProjectInstallSheet = false
+            return
+        }
+
         guard selectedProjectID == defaultProject.id else {
             if !isInstallingDefaultProject {
                 isShowingDefaultProjectInstallSheet = false

@@ -4,6 +4,7 @@ import Foundation
 final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
     private enum DefaultsKey {
         static let appUIScale = "app.uiScale"
+        static let onboardingCompleted = "app.onboardingCompleted"
         static let showLineNumbers = "editor.showLineNumbers"
         static let wrapLines = "editor.wrapLines"
         static let highlightSelectedLine = "editor.highlightSelectedLine"
@@ -55,6 +56,7 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
 
         let settings = AppSettings(
             appUIScale: normalizedScale,
+            hasCompletedOnboarding: defaults.object(forKey: DefaultsKey.onboardingCompleted) as? Bool ?? false,
             showLineNumbers: defaults.object(forKey: DefaultsKey.showLineNumbers) as? Bool ?? true,
             wrapLines: defaults.object(forKey: DefaultsKey.wrapLines) as? Bool ?? true,
             highlightSelectedLine: defaults.object(forKey: DefaultsKey.highlightSelectedLine) as? Bool ?? true,
@@ -129,6 +131,7 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
 
     func save(settings: AppSettings) {
         defaults.set(sanitizedScale(settings.appUIScale), forKey: DefaultsKey.appUIScale)
+        defaults.set(settings.hasCompletedOnboarding, forKey: DefaultsKey.onboardingCompleted)
         defaults.set(settings.showLineNumbers, forKey: DefaultsKey.showLineNumbers)
         defaults.set(settings.wrapLines, forKey: DefaultsKey.wrapLines)
         defaults.set(settings.highlightSelectedLine, forKey: DefaultsKey.highlightSelectedLine)
