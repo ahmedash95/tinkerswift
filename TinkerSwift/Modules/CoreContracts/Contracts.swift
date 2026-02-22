@@ -328,11 +328,3 @@ extension CompletionProviding {
         []
     }
 }
-
-protocol LanguagePlugin: Sendable {
-    var id: String { get }
-    var displayName: String { get }
-    var supportedLanguageIDs: Set<String> { get }
-    var completionProvider: (any CompletionProviding)? { get }
-    var executionProvider: (any CodeExecutionProviding)? { get }
-}

@@ -135,7 +135,7 @@ final class EditorCompletionOrchestrator {
         let triggerCharacter = pendingTriggerCharacter
         pendingTriggerCharacter = nil
 
-        let position = position(in: fullText, utf16Offset: utf16Offset)
+        let position = TextPositionConverter.position(in: fullText, utf16Offset: utf16Offset)
         logger("request completion line=\(position.line) char=\(position.character) trigger=\(triggerCharacter ?? "manual")")
 
         let completionItems = await provider.completionItems(
@@ -245,23 +245,4 @@ final class EditorCompletionOrchestrator {
         return false
     }
 
-    private func position(in text: String, utf16Offset: Int) -> (line: Int, character: Int) {
-        let boundedOffset = min(max(0, utf16Offset), text.utf16.count)
-        var line = 0
-        var lineStart = 0
-        var offset = 0
-
-        for scalar in text.utf16 {
-            guard offset < boundedOffset else {
-                break
-            }
-            if scalar == 10 {
-                line += 1
-                lineStart = offset + 1
-            }
-            offset += 1
-        }
-
-        return (line: line, character: boundedOffset - lineStart)
-    }
 }

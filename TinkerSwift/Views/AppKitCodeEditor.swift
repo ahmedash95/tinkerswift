@@ -21,7 +21,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
     let lspAutoTriggerEnabled: Bool
     let lspServerPathOverride: String
     let lspLanguageID: String
-    let completionProvider: (any CompletionProviding)?
+    let completionProvider: any CompletionProviding
 
     init(
         text: Binding<String>,
@@ -36,7 +36,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         lspAutoTriggerEnabled: Bool = true,
         lspServerPathOverride: String = "",
         lspLanguageID: String = "php",
-        completionProvider: (any CompletionProviding)? = PHPLSPService.shared
+        completionProvider: any CompletionProviding = PHPLSPService.shared
     ) {
         _text = text
         self.fontSize = fontSize
@@ -56,7 +56,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
     func makeCoordinator() -> Coordinator {
         Coordinator(
             text: $text,
-            provider: completionProvider ?? NoopCompletionProvider.shared,
+            provider: completionProvider,
             languageID: lspLanguageID
         )
     }
@@ -100,7 +100,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         context.coordinator.updateVisualState(on: textView, force: true)
         context.coordinator.configureLSP(
             projectPath: projectPath,
-            enabled: isEditable && lspCompletionEnabled && completionProvider != nil,
+            enabled: isEditable && lspCompletionEnabled,
             autoTriggerEnabled: lspAutoTriggerEnabled,
             serverPathOverride: lspServerPathOverride,
             currentText: textView.text ?? ""
@@ -133,7 +133,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         context.coordinator.updateVisualState(on: textView)
         context.coordinator.configureLSP(
             projectPath: projectPath,
-            enabled: isEditable && lspCompletionEnabled && completionProvider != nil,
+            enabled: isEditable && lspCompletionEnabled,
             autoTriggerEnabled: lspAutoTriggerEnabled,
             serverPathOverride: lspServerPathOverride,
             currentText: textView.text ?? ""
@@ -420,12 +420,12 @@ struct AppKitCodeEditor: NSViewRepresentable {
         }
 
         private static func nsRange(for textEdit: LSPTextEdit, in text: String) -> NSRange? {
-            let start = LSPPositionConverter.utf16Offset(
+            let start = TextPositionConverter.utf16Offset(
                 in: text,
                 line: textEdit.startLine,
                 character: textEdit.startCharacter
             )
-            let end = LSPPositionConverter.utf16Offset(
+            let end = TextPositionConverter.utf16Offset(
                 in: text,
                 line: textEdit.endLine,
                 character: textEdit.endCharacter
@@ -441,27 +441,6 @@ struct AppKitCodeEditor: NSViewRepresentable {
         private func logEditor(_ message: String) {
             DebugConsoleStore.shared.append(stream: .app, message: "[EditorCompletion] \(message)")
         }
-    }
-}
-
-private actor NoopCompletionProvider: CompletionProviding {
-    static let shared = NoopCompletionProvider()
-    let languageID = "php"
-
-    func setServerPathOverride(_ value: String) async {}
-
-    func openOrUpdateDocument(uri: String, projectPath: String, text: String, languageID: String) async {}
-
-    func closeDocument(uri: String) async {}
-
-    func completionItems(
-        uri: String,
-        projectPath: String,
-        text: String,
-        utf16Offset: Int,
-        triggerCharacter: String?
-    ) async -> [CompletionCandidate] {
-        []
     }
 }
 
@@ -927,31 +906,6 @@ typealias LSPTextEdit = CompletionTextEdit
 private struct LSPResolvedInsertText: Sendable {
     let text: String
     let selectedRange: NSRange?
-}
-
-private enum LSPPositionConverter {
-    static func utf16Offset(in text: String, line: Int, character: Int) -> Int {
-        let boundedLine = max(0, line)
-        let boundedCharacter = max(0, character)
-
-        var currentLine = 0
-        var offset = 0
-        var lineStart = 0
-
-        for scalar in text.utf16 {
-            if currentLine == boundedLine {
-                break
-            }
-            offset += 1
-            if scalar == 10 {
-                currentLine += 1
-                lineStart = offset
-            }
-        }
-
-        let desiredOffset = lineStart + boundedCharacter
-        return min(max(0, desiredOffset), text.utf16.count)
-    }
 }
 
 typealias LSPCompletionCandidate = CompletionCandidate

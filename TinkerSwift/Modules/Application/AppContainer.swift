@@ -3,7 +3,6 @@ import Foundation
 @MainActor
 final class AppContainer {
     let persistenceStore: any WorkspacePersistenceStore
-    let pluginRegistry: LanguagePluginRegistry
 
     let appModel: AppModel
 
@@ -18,38 +17,18 @@ final class AppContainer {
         defaultProjectInstaller: any DefaultProjectInstalling = LaravelProjectInstaller()
     ) {
         self.persistenceStore = persistenceStore
-        self.pluginRegistry = LanguagePluginRegistry()
         self.phpExecutionProvider = phpExecutionProvider
         self.codeFormatterProvider = codeFormatterProvider
         self.defaultProjectInstaller = defaultProjectInstaller
         self.appModel = AppModel(persistenceStore: persistenceStore)
-
-        pluginRegistry.register(
-            DefaultLanguagePlugin(
-                id: "php",
-                displayName: "PHP",
-                supportedLanguageIDs: ["php"],
-                completionProvider: PHPLSPService.shared,
-                executionProvider: phpExecutionProvider
-            )
-        )
     }
 
     func makeWorkspaceState() -> WorkspaceState {
         WorkspaceState(
             appModel: appModel,
-            pluginRegistry: pluginRegistry,
             executionProvider: phpExecutionProvider,
             codeFormatter: codeFormatterProvider,
             defaultProjectInstaller: defaultProjectInstaller
         )
     }
-}
-
-private struct DefaultLanguagePlugin: LanguagePlugin {
-    let id: String
-    let displayName: String
-    let supportedLanguageIDs: Set<String>
-    let completionProvider: (any CompletionProviding)?
-    let executionProvider: (any CodeExecutionProviding)?
 }

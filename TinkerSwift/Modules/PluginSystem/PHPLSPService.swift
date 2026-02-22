@@ -119,51 +119,6 @@ private enum JSONValueConverter {
     }
 }
 
-private enum LSPPositionConverter {
-    static func position(in text: String, utf16Offset: Int) -> (line: Int, character: Int) {
-        let boundedOffset = min(max(0, utf16Offset), text.utf16.count)
-        var line = 0
-        var lineStart = 0
-        var offset = 0
-
-        for scalar in text.utf16 {
-            guard offset < boundedOffset else {
-                break
-            }
-            if scalar == 10 {
-                line += 1
-                lineStart = offset + 1
-            }
-            offset += 1
-        }
-
-        return (line: line, character: boundedOffset - lineStart)
-    }
-
-    static func utf16Offset(in text: String, line: Int, character: Int) -> Int {
-        let boundedLine = max(0, line)
-        let boundedCharacter = max(0, character)
-
-        var currentLine = 0
-        var offset = 0
-        var lineStart = 0
-
-        for scalar in text.utf16 {
-            if currentLine == boundedLine {
-                break
-            }
-            offset += 1
-            if scalar == 10 {
-                currentLine += 1
-                lineStart = offset
-            }
-        }
-
-        let desiredOffset = lineStart + boundedCharacter
-        return min(max(0, desiredOffset), text.utf16.count)
-    }
-}
-
 actor PHPLSPService: CompletionProviding {
     static let shared = PHPLSPService()
 
@@ -355,7 +310,7 @@ actor PHPLSPService: CompletionProviding {
             try await ensureServer(for: projectPath)
             await openOrUpdateDocument(uri: uri, projectPath: projectPath, text: text, languageID: languageID)
             let prepared = prepareDocumentText(text)
-            let sourcePosition = LSPPositionConverter.position(in: text, utf16Offset: utf16Offset)
+            let sourcePosition = TextPositionConverter.position(in: text, utf16Offset: utf16Offset)
             let lspPosition = (line: sourcePosition.line + prepared.lineOffset, character: sourcePosition.character)
 
             let response = try await request(
@@ -424,7 +379,7 @@ actor PHPLSPService: CompletionProviding {
         await openOrUpdateDocument(uri: uri, projectPath: projectPath, text: text, languageID: languageID)
 
         let prepared = prepareDocumentText(text)
-        let sourcePosition = LSPPositionConverter.position(in: text, utf16Offset: utf16Offset)
+        let sourcePosition = TextPositionConverter.position(in: text, utf16Offset: utf16Offset)
         let lspPosition = (line: sourcePosition.line + prepared.lineOffset, character: sourcePosition.character)
         log(
             "completion request sourceLine=\(sourcePosition.line) sourceChar=\(sourcePosition.character) " +
@@ -856,7 +811,7 @@ actor PHPLSPService: CompletionProviding {
             return candidate
         }
 
-        guard let importEdit = makeImportTextEdit(fqcn: fqcn, in: sourceText) else {
+        guard let importEdit = PHPSymbolImportSupport.makeImportTextEdit(fqcn: fqcn, in: sourceText) else {
             return candidate
         }
 
@@ -901,7 +856,7 @@ actor PHPLSPService: CompletionProviding {
 
     private func inferImportFQCN(for item: LSPParsedCompletionItem) -> String? {
         let candidate = item.candidate
-        let normalizedLabel = sanitizeSymbolName(candidate.label)
+        let normalizedLabel = PHPSymbolImportSupport.sanitizeSymbolName(candidate.label)
         let shortName = normalizedLabel.split(separator: "\\").last.map(String.init) ?? normalizedLabel
         guard !shortName.isEmpty else {
             return nil
@@ -919,7 +874,7 @@ actor PHPLSPService: CompletionProviding {
 
         for source in textSources {
             guard let source, !source.isEmpty else { continue }
-            if let match = bestFQCNMatch(in: source, shortName: shortName) {
+            if let match = PHPSymbolImportSupport.bestFQCNMatch(in: source, shortName: shortName) {
                 return match
             }
         }
@@ -929,7 +884,7 @@ actor PHPLSPService: CompletionProviding {
             collectStrings(from: dataValue, output: &recursiveStrings, limit: 24)
         }
         for source in recursiveStrings {
-            if let match = bestFQCNMatch(in: source, shortName: shortName) {
+            if let match = PHPSymbolImportSupport.bestFQCNMatch(in: source, shortName: shortName) {
                 return match
             }
         }
@@ -958,130 +913,6 @@ actor PHPLSPService: CompletionProviding {
         case .number, .bool, .null:
             return
         }
-    }
-
-    private func bestFQCNMatch(in source: String, shortName: String) -> String? {
-        let candidates = extractFQCNCandidates(from: source)
-        guard !candidates.isEmpty else {
-            return nil
-        }
-
-        for candidate in candidates {
-            if candidate.split(separator: "\\").last.map(String.init) == shortName {
-                return candidate
-            }
-        }
-
-        return candidates.first
-    }
-
-    private func extractFQCNCandidates(from source: String) -> [String] {
-        let pattern = #"\\?[A-Za-z_][A-Za-z0-9_]*(?:\\[A-Za-z_][A-Za-z0-9_]*)+"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return []
-        }
-
-        let range = NSRange(location: 0, length: (source as NSString).length)
-        let matches = regex.matches(in: source, options: [], range: range)
-        var results: [String] = []
-        results.reserveCapacity(matches.count)
-        for match in matches {
-            let raw = (source as NSString).substring(with: match.range)
-            let normalized = sanitizeSymbolName(raw)
-            if normalized.contains("\\") {
-                results.append(normalized)
-            }
-        }
-        return results
-    }
-
-    private func makeImportTextEdit(fqcn: String, in sourceText: String) -> CompletionTextEdit? {
-        let normalized = sanitizeSymbolName(fqcn)
-        guard normalized.contains("\\") else {
-            return nil
-        }
-
-        let lines = sourceText.components(separatedBy: "\n")
-        let escapedFQCN = NSRegularExpression.escapedPattern(for: normalized)
-        let existingPattern = #"^\s*use\s+\\?"# + escapedFQCN + #"\s*;\s*$"#
-        if lines.contains(where: { $0.range(of: existingPattern, options: .regularExpression) != nil }) {
-            return nil
-        }
-
-        let namespaceName = currentNamespace(in: lines)
-        if let namespaceName, normalized.hasPrefix(namespaceName + "\\") {
-            return nil
-        }
-
-        var insertIndex = 0
-        if let first = lines.first, first.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<?php") {
-            insertIndex = 1
-        }
-
-        while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            insertIndex += 1
-        }
-
-        if insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("declare(") {
-            insertIndex += 1
-            while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                insertIndex += 1
-            }
-        }
-
-        if insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("namespace ") {
-            insertIndex += 1
-            while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                insertIndex += 1
-            }
-        }
-
-        while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("use ") {
-            insertIndex += 1
-        }
-
-        var newText = "use \(normalized);\n"
-        if insertIndex < lines.count && !lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            newText += "\n"
-        }
-
-        return CompletionTextEdit(
-            startLine: insertIndex,
-            startCharacter: 0,
-            endLine: insertIndex,
-            endCharacter: 0,
-            newText: newText,
-            selectedRangeInNewText: nil
-        )
-    }
-
-    private func currentNamespace(in lines: [String]) -> String? {
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.hasPrefix("namespace ") else { continue }
-            let namespace = trimmed
-                .replacingOccurrences(of: "namespace ", with: "")
-                .replacingOccurrences(of: ";", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            let normalized = sanitizeSymbolName(namespace)
-            if !normalized.isEmpty {
-                return normalized
-            }
-        }
-        return nil
-    }
-
-    private func sanitizeSymbolName(_ value: String) -> String {
-        var result = value
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "class ", with: "")
-            .replacingOccurrences(of: "interface ", with: "")
-            .replacingOccurrences(of: "trait ", with: "")
-            .replacingOccurrences(of: "enum ", with: "")
-        while result.hasPrefix("\\") {
-            result.removeFirst()
-        }
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func parseCompletionCandidate(

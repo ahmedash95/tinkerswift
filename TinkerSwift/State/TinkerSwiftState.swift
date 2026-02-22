@@ -13,112 +13,6 @@ enum SymbolSearchMode: String, CaseIterable {
     case document
 }
 
-private struct RunHistoryWindowView: View {
-    @Environment(WorkspaceState.self) private var workspaceState
-
-    var body: some View {
-        @Bindable var workspaceState = workspaceState
-
-        NavigationSplitView {
-            List(selection: $workspaceState.selectedRunHistoryItemID) {
-                if workspaceState.selectedProjectRunHistory.isEmpty {
-                    Text("No runs yet for this project")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(workspaceState.selectedProjectRunHistory) { item in
-                        RunHistoryRowView(item: item)
-                            .tag(item.id)
-                    }
-                }
-            }
-            .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 460)
-        } detail: {
-            if let selectedRunHistoryItem = workspaceState.selectedRunHistoryItem {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(Self.dateFormatter.string(from: selectedRunHistoryItem.executedAt))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    AppKitCodeEditor(
-                        text: previewCodeBinding(for: selectedRunHistoryItem),
-                        fontSize: 13 * workspaceState.scale,
-                        showLineNumbers: true,
-                        wrapLines: false,
-                        highlightSelectedLine: false,
-                        syntaxHighlighting: workspaceState.syntaxHighlighting,
-                        isEditable: false
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
-
-                    HStack {
-                        Spacer()
-                        Button("Use") {
-                            workspaceState.useSelectedRunHistoryItem()
-                        }
-                        .keyboardShortcut(.defaultAction)
-                    }
-                }
-                .padding(16)
-            } else {
-                ContentUnavailableView("No Run Selected", systemImage: "clock.arrow.circlepath")
-            }
-        }
-        .navigationTitle("Run History")
-        .navigationSubtitle(workspaceState.selectedProjectName)
-        .onAppear {
-            workspaceState.selectRunHistoryItemIfNeeded()
-        }
-        .onChange(of: workspaceState.selectedProjectID) { _, _ in
-            workspaceState.selectRunHistoryItemIfNeeded()
-        }
-        .navigationSplitViewStyle(.balanced)
-    }
-
-    private func previewCodeBinding(for item: ProjectRunHistoryItem) -> Binding<String> {
-        Binding(
-            get: { item.code },
-            set: { _ in }
-        )
-    }
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .medium
-        return formatter
-    }()
-}
-
-private struct RunHistoryRowView: View {
-    let item: ProjectRunHistoryItem
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(Self.codePreview(for: item.code))
-                .lineLimit(1)
-                .font(.system(.body, design: .monospaced))
-            Text(Self.dateFormatter.string(from: item.executedAt))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 2)
-    }
-
-    private static func codePreview(for code: String) -> String {
-        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "(empty snippet)" }
-        return trimmed.components(separatedBy: .newlines).first ?? "(empty snippet)"
-    }
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
-        return formatter
-    }()
-}
-
 enum RawStreamMode: String, CaseIterable {
     case output
     case error
@@ -135,130 +29,6 @@ enum RawStreamMode: String, CaseIterable {
             return hasStdout ? .output : .error
         }
         return requested
-    }
-}
-
-struct RunMetrics {
-    let durationMs: Double?
-    let peakMemoryBytes: UInt64?
-}
-
-struct ProjectRunHistoryItem: Codable, Hashable, Identifiable {
-    let id: String
-    let projectID: String
-    let code: String
-    let executedAt: Date
-}
-
-struct LaravelProjectInstallResult {
-    let stdout: String
-    let stderr: String
-    let exitCode: Int32
-    let wasSuccessful: Bool
-
-    var combinedOutput: String {
-        [stdout, stderr]
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n\n")
-    }
-}
-
-actor LaravelProjectInstaller: DefaultProjectInstalling {
-    func installDefaultProject(at projectPath: String) async -> LaravelProjectInstallResult {
-        let projectURL = URL(fileURLWithPath: projectPath)
-        let parentURL = projectURL.deletingLastPathComponent()
-
-        do {
-            try FileManager.default.createDirectory(at: parentURL, withIntermediateDirectories: true)
-        } catch {
-            return LaravelProjectInstallResult(
-                stdout: "",
-                stderr: "Failed to create cache directory: \(error.localizedDescription)",
-                exitCode: 1,
-                wasSuccessful: false
-            )
-        }
-
-        let process = Process()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        let environment = BinaryPathResolver.processEnvironment()
-        guard let laravelPath = BinaryPathResolver.effectivePath(for: .laravel) else {
-            return LaravelProjectInstallResult(
-                stdout: "",
-                stderr: "Laravel installer not found. Please install `laravel` and ensure it is available in PATH.",
-                exitCode: 127,
-                wasSuccessful: false
-            )
-        }
-
-        process.currentDirectoryURL = parentURL
-        process.environment = environment
-        process.executableURL = URL(fileURLWithPath: laravelPath)
-        process.arguments = [
-            "new",
-            projectURL.lastPathComponent,
-            "--database=sqlite",
-            "--no-authentication",
-            "--no-interaction",
-            "--force"
-        ]
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        do {
-            try await runAndWaitForTermination(process)
-        } catch {
-            let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-            let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-            let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-            let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-            let fallbackError = stderr.isEmpty ? "Failed to run `laravel new`: \(error.localizedDescription)" : stderr
-
-            return LaravelProjectInstallResult(
-                stdout: stdout,
-                stderr: fallbackError,
-                exitCode: 1,
-                wasSuccessful: false
-            )
-        }
-
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-        var stderr = String(data: stderrData, encoding: .utf8) ?? ""
-        let artisanPath = projectURL.appendingPathComponent("artisan").path
-        let hasArtisan = FileManager.default.fileExists(atPath: artisanPath)
-        let wasSuccessful = process.terminationStatus == 0 && hasArtisan
-
-        if process.terminationStatus == 0 && !hasArtisan {
-            if !stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                stderr += "\n"
-            }
-            stderr += "Laravel command completed, but no artisan file was found at \(artisanPath)."
-        }
-
-        return LaravelProjectInstallResult(
-            stdout: stdout,
-            stderr: stderr,
-            exitCode: process.terminationStatus,
-            wasSuccessful: wasSuccessful
-        )
-    }
-
-    private func runAndWaitForTermination(_ process: Process) async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { _ in
-                continuation.resume()
-            }
-            do {
-                try process.run()
-            } catch {
-                process.terminationHandler = nil
-                continuation.resume(throwing: error)
-            }
-        }
     }
 }
 
@@ -449,6 +219,9 @@ final class WorkspaceState {
         return formatter
     }()
 
+    private static let completionProvider = PHPLSPService.shared
+    private static let completionLanguageID = "php"
+
     private static let defaultCode = """
 use App\\Models\\User;
 
@@ -473,7 +246,6 @@ return $users->toJson();
     }()
 
     let appModel: AppModel
-    private let pluginRegistry: LanguagePluginRegistry?
     private let executionProvider: any CodeExecutionProviding
     private let codeFormatter: any CodeFormattingProviding
     private let defaultProjectInstaller: any DefaultProjectInstalling
@@ -526,14 +298,12 @@ return $users->toJson();
 
     init(
         appModel: AppModel,
-        pluginRegistry: LanguagePluginRegistry? = nil,
         executionProvider: any CodeExecutionProviding = PHPExecutionRunner(),
         codeFormatter: any CodeFormattingProviding = PintCodeFormatter(),
         defaultProjectInstaller: any DefaultProjectInstalling = LaravelProjectInstaller(),
         dockerEnvironmentService: DockerEnvironmentService = .shared
     ) {
         self.appModel = appModel
-        self.pluginRegistry = pluginRegistry
         self.executionProvider = executionProvider
         self.codeFormatter = codeFormatter
         self.defaultProjectInstaller = defaultProjectInstaller
@@ -639,16 +409,15 @@ return $users->toJson();
     }
 
     var effectiveLSPCompletionEnabled: Bool {
-        lspCompletionEnabled && isLSPAvailableForSelectedProject && completionProvider != nil
+        lspCompletionEnabled && isLSPAvailableForSelectedProject
     }
 
-    var completionProvider: (any CompletionProviding)? {
-        let languageID = selectedProject?.languageID ?? "php"
-        return pluginRegistry?.plugin(forLanguageID: languageID)?.completionProvider ?? PHPLSPService.shared
+    var completionProvider: any CompletionProviding {
+        Self.completionProvider
     }
 
     var completionLanguageID: String {
-        selectedProject?.languageID ?? "php"
+        Self.completionLanguageID
     }
 
     var selectedProjectName: String {
@@ -783,7 +552,7 @@ return $users->toJson();
     }
 
     var canShowSymbolSearch: Bool {
-        completionProvider != nil && effectiveLSPCompletionEnabled
+        effectiveLSPCompletionEnabled
     }
 
     var showWorkspaceSymbolSearchFromShortcut: (() -> Void)? {
@@ -961,12 +730,10 @@ return $users->toJson();
     }
 
     func searchWorkspaceSymbols(query: String) async -> [WorkspaceSymbolCandidate] {
-        guard let completionProvider else { return [] }
         return await completionProvider.workspaceSymbols(projectPath: completionProjectPath, query: query)
     }
 
     func searchDocumentSymbols(query: String) async -> [DocumentSymbolCandidate] {
-        guard let completionProvider else { return [] }
         let symbols = await completionProvider.documentSymbols(
             uri: completionDocumentURI,
             projectPath: completionProjectPath,
@@ -1002,8 +769,9 @@ return $users->toJson();
     }
 
     func importSymbol(name: String, detail: String?) {
-        guard let fqcn = inferFullyQualifiedSymbolName(name: name, detail: detail) else { return }
-        addUseStatement(fqcn: fqcn)
+        guard let fqcn = PHPSymbolImportSupport.inferFullyQualifiedSymbolName(name: name, detail: detail) else { return }
+        guard let updatedCode = PHPSymbolImportSupport.insertingUseStatement(fqcn: fqcn, into: code) else { return }
+        code = updatedCode
     }
 
     func selectRunHistoryItemIfNeeded() {
@@ -1198,76 +966,5 @@ return $users->toJson();
             .appendingPathComponent(".tinkerswift_scratch.php")
             .standardizedFileURL
             .absoluteString
-    }
-
-    private func inferFullyQualifiedSymbolName(name: String, detail: String?) -> String? {
-        let normalizedName = sanitizeSymbolName(name)
-        guard !normalizedName.isEmpty else { return nil }
-        if normalizedName.contains("\\") {
-            return normalizedName
-        }
-
-        guard let detail else { return nil }
-        let normalizedDetail = sanitizeSymbolName(detail)
-        guard normalizedDetail.contains("\\") else { return nil }
-        if normalizedDetail.hasSuffix("\\\(normalizedName)") {
-            return normalizedDetail
-        }
-        return "\(normalizedDetail)\\\(normalizedName)"
-    }
-
-    private func sanitizeSymbolName(_ value: String) -> String {
-        var result = value
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "class ", with: "")
-            .replacingOccurrences(of: "interface ", with: "")
-            .replacingOccurrences(of: "trait ", with: "")
-            .replacingOccurrences(of: "enum ", with: "")
-        while result.hasPrefix("\\") {
-            result.removeFirst()
-        }
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func addUseStatement(fqcn: String) {
-        let normalized = sanitizeSymbolName(fqcn)
-        guard !normalized.isEmpty else { return }
-
-        var lines = code.components(separatedBy: "\n")
-        let escaped = NSRegularExpression.escapedPattern(for: normalized)
-        let existingPattern = #"^\s*use\s+\\?"# + escaped + #"\s*;\s*$"#
-        if lines.contains(where: { $0.range(of: existingPattern, options: .regularExpression) != nil }) {
-            return
-        }
-
-        var insertIndex = 0
-        if let first = lines.first, first.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<?php") {
-            insertIndex = 1
-        }
-
-        while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            insertIndex += 1
-        }
-        if insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("declare(") {
-            insertIndex += 1
-            while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                insertIndex += 1
-            }
-        }
-        if insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("namespace ") {
-            insertIndex += 1
-            while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                insertIndex += 1
-            }
-        }
-        while insertIndex < lines.count && lines[insertIndex].trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("use ") {
-            insertIndex += 1
-        }
-
-        lines.insert("use \(normalized);", at: insertIndex)
-        if insertIndex + 1 < lines.count && !lines[insertIndex + 1].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            lines.insert("", at: insertIndex + 1)
-        }
-        code = lines.joined(separator: "\n")
     }
 }
