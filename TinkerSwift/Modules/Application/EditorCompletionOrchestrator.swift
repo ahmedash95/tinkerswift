@@ -16,6 +16,7 @@ final class EditorCompletionOrchestrator {
     private var pendingTriggerCharacter: String?
     private var latestCompletionRequestToken: UInt64 = 0
     private var lastConfigurationSignature = ""
+    private let scratchDocumentFileName = ".tinkerswift_scratch_\(UUID().uuidString.replacingOccurrences(of: "-", with: "")).php"
 
     init(provider: any CompletionProviding, languageID: String, logger: @escaping (String) -> Void) {
         self.provider = provider
@@ -197,7 +198,7 @@ final class EditorCompletionOrchestrator {
 
     private func documentURI(forProjectPath projectPath: String) -> String {
         URL(fileURLWithPath: projectPath, isDirectory: true)
-            .appendingPathComponent(".tinkerswift_scratch.php")
+            .appendingPathComponent(scratchDocumentFileName)
             .standardizedFileURL
             .absoluteString
     }

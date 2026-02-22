@@ -36,7 +36,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         lspAutoTriggerEnabled: Bool = true,
         lspServerPathOverride: String = "",
         lspLanguageID: String = "php",
-        completionProvider: any CompletionProviding = PHPLSPService.shared
+        completionProvider: any CompletionProviding = PHPLSPService()
     ) {
         _text = text
         self.fontSize = fontSize
@@ -160,9 +160,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
             completionOrchestrator = EditorCompletionOrchestrator(
                 provider: provider,
                 languageID: languageID,
-                logger: { message in
-                    DebugConsoleStore.shared.append(stream: .app, message: "[EditorCompletion] \(message)")
-                }
+                logger: { _ in }
             )
         }
 
@@ -264,9 +262,6 @@ struct AppKitCodeEditor: NSViewRepresentable {
                 return
             }
 
-            logEditor(
-                "insert completion label='\(completionItem.candidate.label)' additionalEdits=\(completionItem.candidate.additionalTextEdits.count)"
-            )
             insertCompletion(completionItem.candidate, into: textView)
             completionOrchestrator.didInsertCompletion(finalText: textView.text ?? "")
         }
@@ -438,9 +433,6 @@ struct AppKitCodeEditor: NSViewRepresentable {
             return NSRange(location: start, length: end - start)
         }
 
-        private func logEditor(_ message: String) {
-            DebugConsoleStore.shared.append(stream: .app, message: "[EditorCompletion] \(message)")
-        }
     }
 }
 
@@ -548,7 +540,7 @@ fileprivate final class CodePaneTextView: STTextView {
             self,
             selector: #selector(handleInsertTextNotification(_:)),
             name: .tinkerSwiftInsertTextAtCursor,
-            object: nil
+            object: observedWindow
         )
     }
 
@@ -560,6 +552,7 @@ fileprivate final class CodePaneTextView: STTextView {
     @objc
     private func handleInsertTextNotification(_ notification: Notification) {
         guard isEditable else { return }
+        guard let targetWindow = notification.object as? NSWindow, targetWindow === window else { return }
         guard let payload = notification.userInfo?["text"] as? String else { return }
         guard !payload.isEmpty else { return }
 
@@ -647,7 +640,7 @@ private final class TinkerNeonCoordinator {
     private let theme: Theme
     private let language: TreeSitterLanguage
     private let tsLanguage: SwiftTreeSitter.Language
-    private let tsClient: TreeSitterClient
+    private let tsClient: TreeSitterClient?
     private var prevViewportRange: NSTextRange?
     private var highlightingEnabled = true
 
@@ -658,7 +651,7 @@ private final class TinkerNeonCoordinator {
         tsLanguage = Language(language: language.parser)
         let virtualPrefixLength = language == .php ? Self.virtualPHPPrefix.utf16.count : 0
 
-        tsClient = try! TreeSitterClient(language: tsLanguage) { codePointIndex in
+        tsClient = try? TreeSitterClient(language: tsLanguage) { codePointIndex in
             let adjustedCodePointIndex = max(0, codePointIndex - virtualPrefixLength)
             guard let location = textView.textContentManager.location(at: adjustedCodePointIndex),
                   let position = textView.textContentManager.position(location)
@@ -669,7 +662,7 @@ private final class TinkerNeonCoordinator {
             return Point(row: position.row, column: position.column)
         }
 
-        tsClient.invalidationHandler = { [weak self] indexSet in
+        tsClient?.invalidationHandler = { [weak self] indexSet in
             guard let self else { return }
             let translated = self.actualIndexSet(fromVirtual: indexSet, limit: textView.textContentManager.length)
             guard !translated.isEmpty else { return }
@@ -704,15 +697,19 @@ private final class TinkerNeonCoordinator {
             tokenProvider: tokenProvider(textContentManager: textView.textContentManager)
         )
 
-        let initialContent = virtualizedContent(from: textView.textContentManager.attributedString(in: nil)?.string ?? "")
-        tsClient.willChangeContent(in: .zero)
-        tsClient.didChangeContent(
-            in: .zero,
-            delta: initialContent.utf16.count,
-            limit: initialContent.utf16.count,
-            readHandler: Parser.readFunction(for: initialContent),
-            completionHandler: {}
-        )
+        if let tsClient {
+            let initialContent = virtualizedContent(from: textView.textContentManager.attributedString(in: nil)?.string ?? "")
+            tsClient.willChangeContent(in: .zero)
+            tsClient.didChangeContent(
+                in: .zero,
+                delta: initialContent.utf16.count,
+                limit: initialContent.utf16.count,
+                readHandler: Parser.readFunction(for: initialContent),
+                completionHandler: {}
+            )
+        } else {
+            highlighter = nil
+        }
     }
 
     func updateViewportRange(_ range: NSTextRange?) {
@@ -723,10 +720,11 @@ private final class TinkerNeonCoordinator {
     }
 
     func willChangeContent(in range: NSRange) {
-        tsClient.willChangeContent(in: virtualRange(fromActual: range))
+        tsClient?.willChangeContent(in: virtualRange(fromActual: range))
     }
 
     func didChangeContent(_ textContentManager: NSTextContentManager, in range: NSRange, delta: Int, limit: Int) {
+        guard let tsClient else { return }
         if let string = textContentManager.attributedString(in: nil)?.string {
             let virtualized = virtualizedContent(from: string)
             let readFunction = Parser.readFunction(for: virtualized)
@@ -769,9 +767,13 @@ private final class TinkerNeonCoordinator {
                 completionHandler(.failure(TreeSitterClientError.stateInvalid))
                 return
             }
+            guard let tsClient = self.tsClient else {
+                completionHandler(.success(Neon.TokenApplication(tokens: [], range: range)))
+                return
+            }
 
             let translatedRange = self.virtualRange(fromActual: range)
-            self.tsClient.executeHighlightsQuery(
+            tsClient.executeHighlightsQuery(
                 highlightsQuery,
                 in: translatedRange,
                 executionMode: .asynchronous(prefetch: true),

@@ -120,8 +120,6 @@ private enum JSONValueConverter {
 }
 
 actor PHPLSPService: CompletionProviding {
-    static let shared = PHPLSPService()
-
     private var process: Process?
     private var stdinHandle: FileHandle?
     private var stdoutHandle: FileHandle?
@@ -145,6 +143,10 @@ actor PHPLSPService: CompletionProviding {
 
         serverPathOverride = normalized
         log("server path override changed to '\(normalized.isEmpty ? "default: phpactor" : normalized)'")
+        await stopServer(sendShutdown: true)
+    }
+
+    func shutdown() async {
         await stopServer(sendShutdown: true)
     }
 
@@ -1264,20 +1266,24 @@ actor PHPLSPService: CompletionProviding {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
+        let output: ProcessRunOutput
         do {
-            try await runAndWaitForTermination(process)
+            output = try await ProcessRunner.runAndCapture(
+                process: process,
+                stdoutPipe: stdoutPipe,
+                stderrPipe: stderrPipe
+            )
         } catch {
             builtinPHPFunctions = []
             return []
         }
 
-        guard process.terminationStatus == 0 else {
+        guard output.terminationStatus == 0 else {
             builtinPHPFunctions = []
             return []
         }
 
-        let outputData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        guard let names = try? JSONDecoder().decode([String].self, from: outputData) else {
+        guard let names = try? JSONDecoder().decode([String].self, from: output.stdout) else {
             builtinPHPFunctions = []
             return []
         }
@@ -1288,20 +1294,6 @@ actor PHPLSPService: CompletionProviding {
             .sorted()
         builtinPHPFunctions = normalized
         return normalized
-    }
-
-    private func runAndWaitForTermination(_ process: Process) async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { _ in
-                continuation.resume()
-            }
-            do {
-                try process.run()
-            } catch {
-                process.terminationHandler = nil
-                continuation.resume(throwing: error)
-            }
-        }
     }
 
     private func prepareDocumentText(_ sourceText: String) -> LSPPreparedDocument {
@@ -1516,8 +1508,6 @@ actor PHPLSPService: CompletionProviding {
     }
 
     private func log(_ message: String) {
-        Task { @MainActor in
-            DebugConsoleStore.shared.append(stream: .app, message: "[PhpactorLSP] \(message)")
-        }
+        _ = message
     }
 }

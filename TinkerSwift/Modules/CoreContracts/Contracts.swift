@@ -291,6 +291,7 @@ struct DocumentSymbolCandidate: Sendable {
 protocol CompletionProviding: Sendable {
     var languageID: String { get }
     func setServerPathOverride(_ value: String) async
+    func shutdown() async
     func openOrUpdateDocument(uri: String, projectPath: String, text: String, languageID: String) async
     func closeDocument(uri: String) async
     func completionItems(
@@ -311,6 +312,8 @@ protocol CompletionProviding: Sendable {
 }
 
 extension CompletionProviding {
+    func shutdown() async {}
+
     func definitionLocation(
         uri: String,
         projectPath: String,

@@ -219,9 +219,6 @@ final class WorkspaceState {
         return formatter
     }()
 
-    private static let completionProvider = PHPLSPService.shared
-    private static let completionLanguageID = "php"
-
     private static let defaultCode = """
 use App\\Models\\User;
 
@@ -246,6 +243,8 @@ return $users->toJson();
     }()
 
     let appModel: AppModel
+    private let completionProviderInstance: any CompletionProviding
+    private let completionDocumentFileName: String
     private let executionProvider: any CodeExecutionProviding
     private let codeFormatter: any CodeFormattingProviding
     private let defaultProjectInstaller: any DefaultProjectInstalling
@@ -298,12 +297,15 @@ return $users->toJson();
 
     init(
         appModel: AppModel,
+        completionProvider: any CompletionProviding = PHPLSPService(),
         executionProvider: any CodeExecutionProviding = PHPExecutionRunner(),
         codeFormatter: any CodeFormattingProviding = PintCodeFormatter(),
         defaultProjectInstaller: any DefaultProjectInstalling = LaravelProjectInstaller(),
         dockerEnvironmentService: DockerEnvironmentService = .shared
     ) {
         self.appModel = appModel
+        completionProviderInstance = completionProvider
+        completionDocumentFileName = ".tinkerswift_scratch_\(UUID().uuidString.replacingOccurrences(of: "-", with: "")).php"
         self.executionProvider = executionProvider
         self.codeFormatter = codeFormatter
         self.defaultProjectInstaller = defaultProjectInstaller
@@ -321,8 +323,10 @@ return $users->toJson();
 
     deinit {
         let executionProvider = self.executionProvider
+        let completionProvider = completionProviderInstance
         Task {
             await executionProvider.stop()
+            await completionProvider.shutdown()
         }
     }
 
@@ -387,15 +391,9 @@ return $users->toJson();
     }
 
     var isLSPAvailableForSelectedProject: Bool {
-        if case let .local(path)? = selectedProject?.connection {
-            var isDirectory: ObjCBool = false
-            if FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue {
-                return true
-            }
-        }
-
-        var fallbackIsDirectory: ObjCBool = false
-        return FileManager.default.fileExists(atPath: defaultProject.path, isDirectory: &fallbackIsDirectory) && fallbackIsDirectory.boolValue
+        guard case let .local(path)? = selectedProject?.connection else { return false }
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 
     var completionProjectPath: String {
@@ -405,7 +403,7 @@ return $users->toJson();
                 return path
             }
         }
-        return defaultProject.path
+        return ""
     }
 
     var effectiveLSPCompletionEnabled: Bool {
@@ -413,11 +411,11 @@ return $users->toJson();
     }
 
     var completionProvider: any CompletionProviding {
-        Self.completionProvider
+        completionProviderInstance
     }
 
     var completionLanguageID: String {
-        Self.completionLanguageID
+        completionProvider.languageID
     }
 
     var selectedProjectName: String {
@@ -730,10 +728,12 @@ return $users->toJson();
     }
 
     func searchWorkspaceSymbols(query: String) async -> [WorkspaceSymbolCandidate] {
+        guard !completionProjectPath.isEmpty else { return [] }
         return await completionProvider.workspaceSymbols(projectPath: completionProjectPath, query: query)
     }
 
     func searchDocumentSymbols(query: String) async -> [DocumentSymbolCandidate] {
+        guard !completionProjectPath.isEmpty else { return [] }
         let symbols = await completionProvider.documentSymbols(
             uri: completionDocumentURI,
             projectPath: completionProjectPath,
@@ -751,9 +751,10 @@ return $users->toJson();
     func insertSymbolTextAtCursor(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        guard let targetWindow = NSApp.keyWindow?.sheetParent ?? NSApp.keyWindow else { return }
         NotificationCenter.default.post(
             name: .tinkerSwiftInsertTextAtCursor,
-            object: nil,
+            object: targetWindow,
             userInfo: ["text": trimmed]
         )
     }
@@ -962,8 +963,9 @@ return $users->toJson();
     }
 
     private var completionDocumentURI: String {
-        URL(fileURLWithPath: completionProjectPath, isDirectory: true)
-            .appendingPathComponent(".tinkerswift_scratch.php")
+        guard !completionProjectPath.isEmpty else { return "" }
+        return URL(fileURLWithPath: completionProjectPath, isDirectory: true)
+            .appendingPathComponent(completionDocumentFileName)
             .standardizedFileURL
             .absoluteString
     }

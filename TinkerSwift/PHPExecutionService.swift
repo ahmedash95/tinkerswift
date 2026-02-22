@@ -22,10 +22,6 @@ actor DockerEnvironmentService {
         ])
 
         guard result.exitCode == 0 else {
-            await DebugConsoleStore.shared.append(
-                stream: .app,
-                message: "[Docker] list containers failed: \(result.stderr.trimmingCharacters(in: .whitespacesAndNewlines))"
-            )
             return []
         }
 
@@ -89,55 +85,40 @@ done
     }
 
     private func runDockerCommand(arguments: [String], stdinData: Data? = nil) async -> DockerCommandResult {
-        await withCheckedContinuation { continuation in
-            let process = Process()
-            let stdoutPipe = Pipe()
-            let stderrPipe = Pipe()
-            let stdinPipe = Pipe()
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        let stdinPipe = Pipe()
 
-            process.environment = BinaryPathResolver.processEnvironment()
-            if let dockerPath = BinaryPathResolver.effectivePath(for: .docker) {
-                process.executableURL = URL(fileURLWithPath: dockerPath)
-                process.arguments = arguments
-            } else {
-                continuation.resume(
-                    returning: DockerCommandResult(
-                        stdout: "",
-                        stderr: "docker binary not found. Checked PATH=\(process.environment?["PATH"] ?? "")",
-                        exitCode: 127
-                    )
-                )
-                return
-            }
-            process.standardOutput = stdoutPipe
-            process.standardError = stderrPipe
-            process.standardInput = stdinPipe
+        process.environment = BinaryPathResolver.processEnvironment()
+        if let dockerPath = BinaryPathResolver.effectivePath(for: .docker) {
+            process.executableURL = URL(fileURLWithPath: dockerPath)
+            process.arguments = arguments
+        } else {
+            return DockerCommandResult(
+                stdout: "",
+                stderr: "docker binary not found. Checked PATH=\(process.environment?["PATH"] ?? "")",
+                exitCode: 127
+            )
+        }
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+        process.standardInput = stdinPipe
 
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(returning: DockerCommandResult(stdout: "", stderr: error.localizedDescription, exitCode: 1))
-                return
-            }
-
-            if let stdinData {
-                stdinPipe.fileHandleForWriting.write(stdinData)
-            }
-            stdinPipe.fileHandleForWriting.closeFile()
-
-            process.terminationHandler = { process in
-                let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-                let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-                continuation.resume(
-                    returning: DockerCommandResult(
-                        stdout: stdout,
-                        stderr: stderr,
-                        exitCode: process.terminationStatus
-                    )
-                )
-            }
+        do {
+            let output = try await ProcessRunner.runAndCapture(
+                process: process,
+                stdoutPipe: stdoutPipe,
+                stderrPipe: stderrPipe,
+                stdinData: stdinData
+            )
+            return DockerCommandResult(
+                stdout: String(data: output.stdout, encoding: .utf8) ?? "",
+                stderr: String(data: output.stderr, encoding: .utf8) ?? "",
+                exitCode: output.terminationStatus
+            )
+        } catch {
+            return DockerCommandResult(stdout: "", stderr: error.localizedDescription, exitCode: 1)
         }
     }
 }
@@ -186,13 +167,18 @@ actor PintCodeFormatter: CodeFormattingProviding {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
+        let output: ProcessRunOutput
         do {
-            try await runAndWaitForTermination(process)
+            output = try await ProcessRunner.runAndCapture(
+                process: process,
+                stdoutPipe: stdoutPipe,
+                stderrPipe: stderrPipe
+            )
         } catch {
             return nil
         }
 
-        guard process.terminationStatus == 0 else {
+        guard output.terminationStatus == 0 else {
             return nil
         }
 
@@ -246,20 +232,6 @@ actor PintCodeFormatter: CodeFormattingProviding {
         return code.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func runAndWaitForTermination(_ process: Process) async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { _ in
-                continuation.resume()
-            }
-
-            do {
-                try process.run()
-            } catch {
-                process.terminationHandler = nil
-                continuation.resume(throwing: error)
-            }
-        }
-    }
 }
 
 actor PHPExecutionRunner: CodeExecutionProviding {
@@ -427,17 +399,17 @@ try {
 
         do {
             beginActiveExecution(process: process, runID: runID)
-            try await runAndWaitForTermination(process)
-            process.terminationHandler = nil
-
-            let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-            let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-            let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-            let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+            let output = try await ProcessRunner.runAndCapture(
+                process: process,
+                stdoutPipe: stdoutPipe,
+                stderrPipe: stderrPipe
+            )
+            let stdout = String(data: output.stdout, encoding: .utf8) ?? ""
+            let stderr = String(data: output.stderr, encoding: .utf8) ?? ""
             let runtimeMetrics = Self.readRuntimeMetrics(from: metricsURL)
             let stoppedByRequest = endActiveExecution(runID)
-            let stoppedBySignal = process.terminationReason == .uncaughtSignal &&
-                (process.terminationStatus == SIGTERM || process.terminationStatus == SIGINT)
+            let stoppedBySignal = output.terminationReason == .uncaughtSignal &&
+                (output.terminationStatus == SIGTERM || output.terminationStatus == SIGINT)
             let durationMs = runtimeMetrics?.durationMs ?? Date().timeIntervalSince(startedAt) * 1000.0
             cleanupTemporaryFiles()
 
@@ -445,7 +417,7 @@ try {
                 command: "php \(runnerFileName)",
                 stdout: stdout,
                 stderr: stderr,
-                exitCode: process.terminationStatus,
+                exitCode: output.terminationStatus,
                 durationMs: durationMs,
                 peakMemoryBytes: runtimeMetrics?.peakMemoryBytes,
                 wasStopped: stoppedByRequest || stoppedBySignal
@@ -566,26 +538,25 @@ try {
 
         do {
             beginActiveExecution(process: process, runID: runID)
-            try process.run()
-            stdinPipe.fileHandleForWriting.write(Data(script.utf8))
-            stdinPipe.fileHandleForWriting.closeFile()
-            try await waitForTermination(process)
-
-            let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-            let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-            let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-            let rawStderr = String(data: stderrData, encoding: .utf8) ?? ""
+            let output = try await ProcessRunner.runAndCapture(
+                process: process,
+                stdoutPipe: stdoutPipe,
+                stderrPipe: stderrPipe,
+                stdinData: Data(script.utf8)
+            )
+            let stdout = String(data: output.stdout, encoding: .utf8) ?? ""
+            let rawStderr = String(data: output.stderr, encoding: .utf8) ?? ""
             let parsed = parseDockerRuntimeMetrics(from: rawStderr)
 
             let stoppedByRequest = endActiveExecution(runID)
-            let stoppedBySignal = process.terminationReason == .uncaughtSignal &&
-                (process.terminationStatus == SIGTERM || process.terminationStatus == SIGINT)
+            let stoppedBySignal = output.terminationReason == .uncaughtSignal &&
+                (output.terminationStatus == SIGTERM || output.terminationStatus == SIGINT)
 
             return PHPExecutionResult(
                 command: "docker exec -i -w \(config.projectPath) \(config.containerID) php",
                 stdout: stdout,
                 stderr: parsed.stderr,
-                exitCode: process.terminationStatus,
+                exitCode: output.terminationStatus,
                 durationMs: parsed.metrics?.durationMs ?? Date().timeIntervalSince(startedAt) * 1000.0,
                 peakMemoryBytes: parsed.metrics?.peakMemoryBytes,
                 wasStopped: stoppedByRequest || stoppedBySignal
@@ -672,31 +643,6 @@ try {
     private func beginActiveExecution(process: Process, runID: UUID) {
         activeProcess = process
         activeRunID = runID
-    }
-
-    private func runAndWaitForTermination(_ process: Process) async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { _ in
-                continuation.resume()
-            }
-            do {
-                try process.run()
-            } catch {
-                process.terminationHandler = nil
-                continuation.resume(throwing: error)
-            }
-        }
-    }
-
-    private func waitForTermination(_ process: Process) async throws {
-        if !process.isRunning {
-            return
-        }
-        try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { _ in
-                continuation.resume()
-            }
-        }
     }
 
     @discardableResult

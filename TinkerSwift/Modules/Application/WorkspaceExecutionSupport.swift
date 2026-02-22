@@ -69,32 +69,29 @@ actor LaravelProjectInstaller: DefaultProjectInstalling {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
+        let output: ProcessRunOutput
         do {
-            try await runAndWaitForTermination(process)
+            output = try await ProcessRunner.runAndCapture(
+                process: process,
+                stdoutPipe: stdoutPipe,
+                stderrPipe: stderrPipe
+            )
         } catch {
-            let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-            let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-            let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-            let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-            let fallbackError = stderr.isEmpty ? "Failed to run `laravel new`: \(error.localizedDescription)" : stderr
-
             return LaravelProjectInstallResult(
-                stdout: stdout,
-                stderr: fallbackError,
+                stdout: "",
+                stderr: "Failed to run `laravel new`: \(error.localizedDescription)",
                 exitCode: 1,
                 wasSuccessful: false
             )
         }
 
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-        var stderr = String(data: stderrData, encoding: .utf8) ?? ""
+        let stdout = String(data: output.stdout, encoding: .utf8) ?? ""
+        var stderr = String(data: output.stderr, encoding: .utf8) ?? ""
         let artisanPath = projectURL.appendingPathComponent("artisan").path
         let hasArtisan = FileManager.default.fileExists(atPath: artisanPath)
-        let wasSuccessful = process.terminationStatus == 0 && hasArtisan
+        let wasSuccessful = output.terminationStatus == 0 && hasArtisan
 
-        if process.terminationStatus == 0 && !hasArtisan {
+        if output.terminationStatus == 0 && !hasArtisan {
             if !stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 stderr += "\n"
             }
@@ -104,22 +101,8 @@ actor LaravelProjectInstaller: DefaultProjectInstalling {
         return LaravelProjectInstallResult(
             stdout: stdout,
             stderr: stderr,
-            exitCode: process.terminationStatus,
+            exitCode: output.terminationStatus,
             wasSuccessful: wasSuccessful
         )
-    }
-
-    private func runAndWaitForTermination(_ process: Process) async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { _ in
-                continuation.resume()
-            }
-            do {
-                try process.run()
-            } catch {
-                process.terminationHandler = nil
-                continuation.resume(throwing: error)
-            }
-        }
     }
 }

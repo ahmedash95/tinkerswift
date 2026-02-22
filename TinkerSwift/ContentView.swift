@@ -123,13 +123,6 @@ struct ContentView: View {
                 .help("Run History")
                 .disabled(!workspaceState.canShowRunHistory)
 
-                Button {
-                    DebugConsoleWindowManager.shared.show()
-                } label: {
-                    Image(systemName: "terminal")
-                }
-                .help("Open Debug Console")
-
                 Button(action: workspaceState.revealSelectedProjectInFinder) {
                     Image(systemName: "folder.badge.gearshape")
                 }
