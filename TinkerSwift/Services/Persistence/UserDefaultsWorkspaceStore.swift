@@ -323,14 +323,38 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
                 connection: normalized.connection
             )
         case let .ssh(config):
-            let host = config.host.trimmingCharacters(in: .whitespacesAndNewlines)
+            var host = config.host.trimmingCharacters(in: .whitespacesAndNewlines)
+            var username = config.username.trimmingCharacters(in: .whitespacesAndNewlines)
+            if username.isEmpty, host.contains("@") {
+                let parts = host.split(separator: "@", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+                if parts.count == 2 {
+                    username = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                    host = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+            let port = min(max(config.port, 1), 65535)
             let projectPath = normalizeDockerPath(config.projectPath)
-            guard !host.isEmpty, !projectPath.isEmpty else { return nil }
+            let privateKeyPath = config.privateKeyPath.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !host.isEmpty, !username.isEmpty, !projectPath.isEmpty else { return nil }
+            guard !host.contains(where: \.isWhitespace), !username.contains(where: \.isWhitespace) else { return nil }
+            let normalized = WorkspaceProject.ssh(
+                host: host,
+                port: port,
+                username: username,
+                projectPath: projectPath,
+                authenticationMethod: config.authenticationMethod,
+                privateKeyPath: privateKeyPath,
+                password: config.password,
+                languageID: project.languageID
+            )
+            if project.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return normalized
+            }
             return WorkspaceProject(
-                id: "ssh:\(host):\(projectPath)",
-                name: project.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "\(host) · \(URL(fileURLWithPath: projectPath).lastPathComponent)" : project.name,
+                id: normalized.id,
+                name: project.name,
                 languageID: project.languageID,
-                connection: .ssh(SSHProjectConfig(host: host, projectPath: projectPath))
+                connection: normalized.connection
             )
         }
     }

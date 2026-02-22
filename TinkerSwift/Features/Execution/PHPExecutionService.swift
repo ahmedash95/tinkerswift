@@ -240,7 +240,7 @@ actor PHPExecutionRunner: CodeExecutionProviding {
         let peakMemoryBytes: UInt64
     }
 
-    private let dockerMetricsPrefix = "__TINKERSWIFT_METRICS__"
+    private let remoteMetricsPrefix = "__TINKERSWIFT_METRICS__"
     private var activeProcess: Process?
     private var activeRunID: UUID?
     private var stopRequestedRunIDs = Set<UUID>()
@@ -251,16 +251,8 @@ actor PHPExecutionRunner: CodeExecutionProviding {
             return await runLocal(code: code, projectPath: path)
         case let .docker(config):
             return await runDocker(code: code, config: config)
-        case .ssh:
-            return PHPExecutionResult(
-                command: "php <unavailable>",
-                stdout: "",
-                stderr: "SSH projects are not supported yet.",
-                exitCode: 1,
-                durationMs: nil,
-                peakMemoryBytes: nil,
-                wasStopped: false
-            )
+        case let .ssh(config):
+            return await runSSH(code: code, config: config)
         }
     }
 
@@ -481,7 +473,7 @@ try {
     }
     $__durationMs = (microtime(true) - $__start) * 1000.0;
     $__peakMemoryBytes = memory_get_peak_usage(true);
-    fwrite(STDERR, "\(dockerMetricsPrefix)" . json_encode(['durationMs' => $__durationMs, 'peakMemoryBytes' => $__peakMemoryBytes]) . PHP_EOL);
+    fwrite(STDERR, "\(remoteMetricsPrefix)" . json_encode(['durationMs' => $__durationMs, 'peakMemoryBytes' => $__peakMemoryBytes]) . PHP_EOL);
     exit(0);
 } catch (Throwable $e) {
     $__stdout = ob_get_clean();
@@ -491,7 +483,7 @@ try {
     fwrite(STDERR, (string) $e . PHP_EOL);
     $__durationMs = (microtime(true) - $__start) * 1000.0;
     $__peakMemoryBytes = memory_get_peak_usage(true);
-    fwrite(STDERR, "\(dockerMetricsPrefix)" . json_encode(['durationMs' => $__durationMs, 'peakMemoryBytes' => $__peakMemoryBytes]) . PHP_EOL);
+    fwrite(STDERR, "\(remoteMetricsPrefix)" . json_encode(['durationMs' => $__durationMs, 'peakMemoryBytes' => $__peakMemoryBytes]) . PHP_EOL);
     exit(1);
 }
 """
@@ -546,7 +538,7 @@ try {
             )
             let stdout = String(data: output.stdout, encoding: .utf8) ?? ""
             let rawStderr = String(data: output.stderr, encoding: .utf8) ?? ""
-            let parsed = parseDockerRuntimeMetrics(from: rawStderr)
+            let parsed = parseRemoteRuntimeMetrics(from: rawStderr)
 
             let stoppedByRequest = endActiveExecution(runID)
             let stoppedBySignal = output.terminationReason == .uncaughtSignal &&
@@ -575,6 +567,136 @@ try {
         }
     }
 
+    private func runSSH(code: String, config: SSHProjectConfig) async -> PHPExecutionResult {
+        let body = Self.normalizedSnippetBody(code)
+        let encodedBody = Data(body.utf8).base64EncodedString()
+        let script = """
+<?php
+declare(strict_types=1);
+
+use Illuminate\\Contracts\\Console\\Kernel;
+
+if (!file_exists('artisan')) {
+    fwrite(STDERR, "No artisan file found in working directory: " . getcwd() . PHP_EOL);
+    exit(127);
+}
+
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(Kernel::class)->bootstrap();
+
+$__start = microtime(true);
+$__code = base64_decode('\(encodedBody)');
+if ($__code === false) {
+    fwrite(STDERR, "Failed to decode snippet" . PHP_EOL);
+    exit(1);
+}
+
+ob_start();
+try {
+    $__result = eval($__code);
+    $__stdout = ob_get_clean();
+    if ($__stdout !== '') {
+        fwrite(STDOUT, $__stdout);
+    }
+
+    if ($__result !== null) {
+        if (is_scalar($__result)) {
+            fwrite(STDOUT, (string) $__result . PHP_EOL);
+        } else {
+            ob_start();
+            var_dump($__result);
+            fwrite(STDOUT, ob_get_clean());
+        }
+    }
+    $__durationMs = (microtime(true) - $__start) * 1000.0;
+    $__peakMemoryBytes = memory_get_peak_usage(true);
+    fwrite(STDERR, "\(remoteMetricsPrefix)" . json_encode(['durationMs' => $__durationMs, 'peakMemoryBytes' => $__peakMemoryBytes]) . PHP_EOL);
+    exit(0);
+} catch (Throwable $e) {
+    $__stdout = ob_get_clean();
+    if ($__stdout !== '') {
+        fwrite(STDOUT, $__stdout);
+    }
+    fwrite(STDERR, (string) $e . PHP_EOL);
+    $__durationMs = (microtime(true) - $__start) * 1000.0;
+    $__peakMemoryBytes = memory_get_peak_usage(true);
+    fwrite(STDERR, "\(remoteMetricsPrefix)" . json_encode(['durationMs' => $__durationMs, 'peakMemoryBytes' => $__peakMemoryBytes]) . PHP_EOL);
+    exit(1);
+}
+"""
+
+        let remoteCommand = sshRemoteRunCommand(projectPath: config.projectPath)
+        let invocation: SSHInvocation
+        switch makeSSHInvocation(config: config, remoteCommand: remoteCommand) {
+        case .success(let resolved):
+            invocation = resolved
+        case .failure(let error):
+            return PHPExecutionResult(
+                command: "ssh \(config.username)@\(config.host) <php-script>",
+                stdout: "",
+                stderr: error.localizedDescription,
+                exitCode: 1,
+                durationMs: nil,
+                peakMemoryBytes: nil,
+                wasStopped: false
+            )
+        }
+
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        let stdinPipe = Pipe()
+        process.environment = BinaryPathResolver.processEnvironment()
+        process.executableURL = URL(fileURLWithPath: invocation.executablePath)
+        process.arguments = invocation.arguments
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+        process.standardInput = stdinPipe
+
+        let runID = UUID()
+        let startedAt = Date()
+        let commandDescription = invocation.commandDescription
+
+        do {
+            beginActiveExecution(process: process, runID: runID)
+            let output = try await ProcessRunner.runAndCapture(
+                process: process,
+                stdoutPipe: stdoutPipe,
+                stderrPipe: stderrPipe,
+                stdinData: Data(script.utf8)
+            )
+            let stdout = String(data: output.stdout, encoding: .utf8) ?? ""
+            let rawStderr = String(data: output.stderr, encoding: .utf8) ?? ""
+            let parsed = parseRemoteRuntimeMetrics(from: rawStderr)
+
+            let stoppedByRequest = endActiveExecution(runID)
+            let stoppedBySignal = output.terminationReason == .uncaughtSignal &&
+                (output.terminationStatus == SIGTERM || output.terminationStatus == SIGINT)
+
+            return PHPExecutionResult(
+                command: commandDescription,
+                stdout: stdout,
+                stderr: parsed.stderr,
+                exitCode: output.terminationStatus,
+                durationMs: parsed.metrics?.durationMs ?? Date().timeIntervalSince(startedAt) * 1000.0,
+                peakMemoryBytes: parsed.metrics?.peakMemoryBytes,
+                wasStopped: stoppedByRequest || stoppedBySignal
+            )
+        } catch {
+            _ = endActiveExecution(runID)
+            return PHPExecutionResult(
+                command: commandDescription,
+                stdout: "",
+                stderr: "Failed to run SSH PHP process: \(error.localizedDescription)",
+                exitCode: 1,
+                durationMs: nil,
+                peakMemoryBytes: nil,
+                wasStopped: false
+            )
+        }
+    }
+
     func stop() async {
         if let runID = activeRunID {
             stopRequestedRunIDs.insert(runID)
@@ -595,13 +717,13 @@ try {
         }
     }
 
-    private func parseDockerRuntimeMetrics(from stderr: String) -> (stderr: String, metrics: RuntimeMetrics?) {
+    private func parseRemoteRuntimeMetrics(from stderr: String) -> (stderr: String, metrics: RuntimeMetrics?) {
         var cleanedLines: [String] = []
         var metrics: RuntimeMetrics?
         for line in stderr.split(whereSeparator: \.isNewline) {
             let text = String(line)
-            if text.hasPrefix(dockerMetricsPrefix) {
-                let payload = String(text.dropFirst(dockerMetricsPrefix.count))
+            if text.hasPrefix(remoteMetricsPrefix) {
+                let payload = String(text.dropFirst(remoteMetricsPrefix.count))
                 if let data = payload.data(using: .utf8),
                    let decoded = try? JSONDecoder().decode(RuntimeMetrics.self, from: data)
                 {
@@ -613,6 +735,105 @@ try {
         }
         let cleaned = cleanedLines.joined(separator: "\n")
         return (stderr: cleaned, metrics: metrics)
+    }
+
+    private struct SSHInvocation {
+        let executablePath: String
+        let arguments: [String]
+        let commandDescription: String
+    }
+
+    private struct SSHInvocationError: LocalizedError {
+        let message: String
+        var errorDescription: String? { message }
+    }
+
+    private func makeSSHInvocation(config: SSHProjectConfig, remoteCommand: String) -> Result<SSHInvocation, SSHInvocationError> {
+        guard let sshPath = resolveExecutablePath(named: "ssh", preferredPaths: ["/usr/bin/ssh"]) else {
+            return .failure(SSHInvocationError(message: "SSH binary not found. Expected /usr/bin/ssh or a PATH-discoverable ssh executable."))
+        }
+
+        let target = "\(config.username)@\(config.host)"
+        var sshArguments = [
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "ConnectTimeout=8",
+            "-p", "\(config.port)"
+        ]
+
+        switch config.authenticationMethod {
+        case .privateKey:
+            let keyPath = (config.privateKeyPath as NSString).expandingTildeInPath
+            guard !keyPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return .failure(SSHInvocationError(message: "Private key path is required for private key authentication."))
+            }
+            guard FileManager.default.fileExists(atPath: keyPath) else {
+                return .failure(SSHInvocationError(message: "Private key file not found at: \(keyPath)"))
+            }
+            sshArguments += [
+                "-o", "BatchMode=yes",
+                "-o", "PreferredAuthentications=publickey",
+                "-i", keyPath
+            ]
+            sshArguments += [target, remoteCommand]
+            return .success(
+                SSHInvocation(
+                    executablePath: sshPath,
+                    arguments: sshArguments,
+                    commandDescription: "ssh \(target) \"\(remoteCommand)\""
+                )
+            )
+        case .password:
+            guard !config.password.isEmpty else {
+                return .failure(SSHInvocationError(message: "Password is required for password authentication."))
+            }
+            guard let sshpassPath = resolveExecutablePath(
+                named: "sshpass",
+                preferredPaths: ["/opt/homebrew/bin/sshpass", "/usr/local/bin/sshpass"]
+            ) else {
+                return .failure(SSHInvocationError(message: "Password authentication requires `sshpass` to be installed."))
+            }
+            sshArguments += [
+                "-o", "BatchMode=no",
+                "-o", "PreferredAuthentications=password,keyboard-interactive",
+                "-o", "PubkeyAuthentication=no",
+                "-o", "NumberOfPasswordPrompts=1"
+            ]
+            let arguments = ["-p", config.password, sshPath] + sshArguments + [target, remoteCommand]
+            return .success(
+                SSHInvocation(
+                    executablePath: sshpassPath,
+                    arguments: arguments,
+                    commandDescription: "sshpass -p ***** ssh \(target) \"\(remoteCommand)\""
+                )
+            )
+        }
+    }
+
+    private func sshRemoteRunCommand(projectPath: String) -> String {
+        let quotedPath = Self.shellSingleQuoted(projectPath)
+        return "cd \(quotedPath) && php -d display_errors=1 -d html_errors=0 -d error_reporting=E_ALL"
+    }
+
+    private func resolveExecutablePath(named binary: String, preferredPaths: [String] = []) -> String? {
+        for path in preferredPaths where FileManager.default.isExecutableFile(atPath: path) {
+            return path
+        }
+
+        let pathValue = BinaryPathResolver.processEnvironment()["PATH"] ?? ""
+        for entry in pathValue.split(separator: ":") {
+            let candidate = URL(fileURLWithPath: String(entry), isDirectory: true)
+                .appendingPathComponent(binary)
+                .path
+            if FileManager.default.isExecutableFile(atPath: candidate) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    private static func shellSingleQuoted(_ value: String) -> String {
+        let escaped = value.replacingOccurrences(of: "'", with: "'\\''")
+        return "'\(escaped)'"
     }
 
     private static func normalizedSnippet(_ rawCode: String) -> String {
@@ -653,5 +874,38 @@ try {
             activeProcess = nil
         }
         return wasStopped
+    }
+}
+
+actor SSHConnectionTester: SSHConnectionTesting {
+    private let runner = PHPExecutionRunner()
+
+    func testConnection(config: SSHProjectConfig) async -> SSHConnectionTestResult {
+        let project = WorkspaceProject(
+            id: "ssh:test:\(UUID().uuidString)",
+            name: "SSH Test",
+            languageID: "php",
+            connection: .ssh(config)
+        )
+        let result = await runner.run(code: "return 'ok';", context: ExecutionContext(project: project))
+
+        if result.exitCode == 0 {
+            return SSHConnectionTestResult(success: true, message: "Connection successful.")
+        }
+
+        let errorText = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !errorText.isEmpty {
+            return SSHConnectionTestResult(success: false, message: errorText)
+        }
+
+        let output = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !output.isEmpty {
+            return SSHConnectionTestResult(success: false, message: output)
+        }
+
+        return SSHConnectionTestResult(
+            success: false,
+            message: "Connection test failed (exit code \(result.exitCode))."
+        )
     }
 }

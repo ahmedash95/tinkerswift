@@ -21,3 +21,12 @@ protocol CodeFormattingProviding: Sendable {
 protocol DefaultProjectInstalling: Sendable {
     func installDefaultProject(at projectPath: String, command: String) async -> LaravelProjectInstallResult
 }
+
+struct SSHConnectionTestResult: Sendable {
+    let success: Bool
+    let message: String
+}
+
+protocol SSHConnectionTesting: Sendable {
+    func testConnection(config: SSHProjectConfig) async -> SSHConnectionTestResult
+}

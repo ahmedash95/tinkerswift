@@ -248,6 +248,7 @@ return $users->toJson();
     private let executionProvider: any CodeExecutionProviding
     private let codeFormatter: any CodeFormattingProviding
     private let defaultProjectInstaller: any DefaultProjectInstalling
+    private let sshConnectionTester: any SSHConnectionTesting
     private let dockerEnvironmentService: DockerEnvironmentService
     private let defaultProject = WorkspaceProject.local(path: WorkspaceState.defaultProjectPath)
     private var historyWindowController: NSWindowController?
@@ -256,9 +257,12 @@ return $users->toJson();
     var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
     var isPickingProjectFolder = false
     var isShowingDockerProjectSheet = false
+    var isShowingSSHProjectSheet = false
+    var isShowingProjectEditSheet = false
     var isShowingRenameProjectSheet = false
     var isShowingSymbolSearchSheet = false
     var symbolSearchMode: SymbolSearchMode = .workspace
+    var editingProjectID = ""
     var renamingProjectID = ""
     var renamingProjectName = ""
     var isRunning = false
@@ -302,6 +306,7 @@ return $users->toJson();
         executionProvider: any CodeExecutionProviding = PHPExecutionRunner(),
         codeFormatter: any CodeFormattingProviding = PintCodeFormatter(),
         defaultProjectInstaller: any DefaultProjectInstalling = LaravelProjectInstaller(),
+        sshConnectionTester: any SSHConnectionTesting = SSHConnectionTester(),
         dockerEnvironmentService: DockerEnvironmentService = .shared
     ) {
         self.appModel = appModel
@@ -310,6 +315,7 @@ return $users->toJson();
         self.executionProvider = executionProvider
         self.codeFormatter = codeFormatter
         self.defaultProjectInstaller = defaultProjectInstaller
+        self.sshConnectionTester = sshConnectionTester
         self.dockerEnvironmentService = dockerEnvironmentService
         let savedProjectID = appModel.lastSelectedProjectID
         if savedProjectID.isEmpty || !([defaultProject] + appModel.projects).contains(where: { $0.id == savedProjectID }) {
@@ -381,6 +387,10 @@ return $users->toJson();
 
     var selectedProject: WorkspaceProject? {
         projects.first(where: { $0.id == selectedProjectID })
+    }
+
+    var editingProject: WorkspaceProject? {
+        projects.first(where: { $0.id == editingProjectID })
     }
 
     var selectedProjectPath: String {
@@ -628,11 +638,89 @@ return $users->toJson();
         selectedProjectID = project.id
     }
 
+    func addSSHProject(
+        host: String,
+        port: Int,
+        username: String,
+        projectPath: String,
+        authenticationMethod: SSHAuthenticationMethod,
+        privateKeyPath: String,
+        password: String,
+        displayName: String? = nil
+    ) {
+        let normalizedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedPath = projectPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedHost.isEmpty, !normalizedUsername.isEmpty, !normalizedPath.isEmpty else { return }
+        guard !normalizedHost.contains(where: \.isWhitespace), !normalizedUsername.contains(where: \.isWhitespace) else { return }
+
+        var project = WorkspaceProject.ssh(
+            host: normalizedHost,
+            port: port,
+            username: normalizedUsername,
+            projectPath: normalizedPath,
+            authenticationMethod: authenticationMethod,
+            privateKeyPath: privateKeyPath,
+            password: password
+        )
+        let normalizedName = (displayName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !normalizedName.isEmpty {
+            project.name = normalizedName
+        }
+        appModel.upsertProject(project)
+        selectedProjectID = project.id
+    }
+
+    func testSSHConnection(
+        host: String,
+        port: Int,
+        username: String,
+        projectPath: String,
+        authenticationMethod: SSHAuthenticationMethod,
+        privateKeyPath: String,
+        password: String
+    ) async -> SSHConnectionTestResult {
+        let normalizedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedPath = projectPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedHost.isEmpty, !normalizedUsername.isEmpty, !normalizedPath.isEmpty else {
+            return SSHConnectionTestResult(success: false, message: "Host, username, and project path are required.")
+        }
+        guard !normalizedHost.contains(where: \.isWhitespace), !normalizedUsername.contains(where: \.isWhitespace) else {
+            return SSHConnectionTestResult(success: false, message: "Host and username must not contain spaces.")
+        }
+
+        let project = WorkspaceProject.ssh(
+            host: normalizedHost,
+            port: port,
+            username: normalizedUsername,
+            projectPath: normalizedPath,
+            authenticationMethod: authenticationMethod,
+            privateKeyPath: privateKeyPath,
+            password: password
+        )
+        guard case let .ssh(config) = project.connection else {
+            return SSHConnectionTestResult(success: false, message: "Invalid SSH configuration.")
+        }
+        return await sshConnectionTester.testConnection(config: config)
+    }
+
     func beginRenamingProject(_ project: WorkspaceProject) {
         guard canRenameProject(project) else { return }
         renamingProjectID = project.id
         renamingProjectName = project.name
         isShowingRenameProjectSheet = true
+    }
+
+    func beginEditingProject(_ project: WorkspaceProject) {
+        guard canEditProject(project) else { return }
+        editingProjectID = project.id
+        isShowingProjectEditSheet = true
+    }
+
+    func cancelEditingProject() {
+        editingProjectID = ""
+        isShowingProjectEditSheet = false
     }
 
     func saveProjectRename() {
@@ -646,6 +734,31 @@ return $users->toJson();
         updated.name = normalizedName
         appModel.upsertProject(updated)
         isShowingRenameProjectSheet = false
+    }
+
+    func saveEditedProject(oldProjectID: String, updatedProject: WorkspaceProject) {
+        guard canEditProject(updatedProject) else { return }
+
+        appModel.projects.removeAll { $0.id == oldProjectID }
+        appModel.upsertProject(updatedProject)
+
+        if selectedProjectID == oldProjectID {
+            selectedProjectID = updatedProject.id
+        }
+
+        editingProjectID = ""
+        isShowingProjectEditSheet = false
+    }
+
+    func deleteProject(_ project: WorkspaceProject) {
+        guard canDeleteProject(project) else { return }
+        appModel.projects.removeAll { $0.id == project.id }
+        if editingProjectID == project.id {
+            cancelEditingProject()
+        }
+        if selectedProjectID == project.id {
+            selectedProjectID = defaultProject.id
+        }
     }
 
     func listDockerContainers() async -> [DockerContainerSummary] {
@@ -893,6 +1006,14 @@ return $users->toJson();
     }
 
     func canRenameProject(_ project: WorkspaceProject) -> Bool {
+        project.id != defaultProject.id
+    }
+
+    func canEditProject(_ project: WorkspaceProject) -> Bool {
+        project.id != defaultProject.id
+    }
+
+    func canDeleteProject(_ project: WorkspaceProject) -> Bool {
         project.id != defaultProject.id
     }
 

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -30,7 +31,10 @@ struct ContentView: View {
                             Button {
                                 workspaceState.selectedProjectID = project.id
                             } label: {
-                                Label(project.name, systemImage: workspaceState.selectedProjectID == project.id ? "checkmark" : (project.connection.kind == .docker ? "shippingbox.fill" : "folder"))
+                                Label(
+                                    project.name,
+                                    systemImage: workspaceState.selectedProjectID == project.id ? "checkmark" : project.connection.kind.projectSymbolName
+                                )
                             }
                         }
                     }
@@ -47,6 +51,12 @@ struct ContentView: View {
                         workspaceState.isShowingDockerProjectSheet = true
                     } label: {
                         Label("Add Docker Project", systemImage: "shippingbox")
+                    }
+
+                    Button {
+                        workspaceState.isShowingSSHProjectSheet = true
+                    } label: {
+                        Label("Add SSH Project", systemImage: "network")
                     }
                 } label: {
                     Image(systemName: "folder")
@@ -146,6 +156,14 @@ struct ContentView: View {
         }
         .sheet(isPresented: $workspaceState.isShowingDockerProjectSheet) {
             DockerProjectSetupSheet()
+                .environment(workspaceState)
+        }
+        .sheet(isPresented: $workspaceState.isShowingSSHProjectSheet) {
+            SSHProjectSetupSheet()
+                .environment(workspaceState)
+        }
+        .sheet(isPresented: $workspaceState.isShowingProjectEditSheet) {
+            ProjectEditSheet()
                 .environment(workspaceState)
         }
         .sheet(isPresented: $workspaceState.isShowingRenameProjectSheet) {
@@ -366,6 +384,511 @@ struct DockerProjectSetupSheet: View {
         }
         let tail = URL(fileURLWithPath: normalizedPath).lastPathComponent
         projectName = tail.isEmpty ? selectedContainer.name : "\(selectedContainer.name) · \(tail)"
+    }
+}
+
+private struct SSHProjectSetupSheet: View {
+    @Environment(WorkspaceState.self) private var workspaceState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var host = ""
+    @State private var port = "22"
+    @State private var username = ""
+    @State private var projectPath = "/var/www/html"
+    @State private var authenticationMethod: SSHAuthenticationMethod = .privateKey
+    @State private var privateKeyPath = ""
+    @State private var password = ""
+    @State private var projectName = ""
+
+    @State private var isTestingConnection = false
+    @State private var connectionStatusMessage = ""
+    @State private var errorMessage = ""
+
+    private var trimmedHost: String { host.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var trimmedUsername: String { username.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var trimmedProjectPath: String { projectPath.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var trimmedPrivateKeyPath: String { privateKeyPath.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var normalizedPort: Int? {
+        guard let value = Int(port.trimmingCharacters(in: .whitespacesAndNewlines)), (1 ... 65535).contains(value) else {
+            return nil
+        }
+        return value
+    }
+
+    private var canSubmit: Bool {
+        guard !trimmedHost.isEmpty,
+              !trimmedUsername.isEmpty,
+              !trimmedProjectPath.isEmpty,
+              normalizedPort != nil,
+              !trimmedHost.contains(where: \.isWhitespace),
+              !trimmedUsername.contains(where: \.isWhitespace)
+        else {
+            return false
+        }
+
+        switch authenticationMethod {
+        case .privateKey:
+            return !trimmedPrivateKeyPath.isEmpty
+        case .password:
+            return !password.isEmpty
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Add SSH Project")
+                .font(.title3.weight(.semibold))
+
+            Text("Configure connection settings, then test before saving.")
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                TextField("Host (example: server.example.com)", text: $host)
+                    .textFieldStyle(.roundedBorder)
+                TextField("Port", text: $port)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 88)
+                TextField("Username", text: $username)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 180)
+            }
+
+            Picker("Authentication", selection: $authenticationMethod) {
+                ForEach(SSHAuthenticationMethod.allCases, id: \.self) { method in
+                    Text(method.displayName).tag(method)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            switch authenticationMethod {
+            case .privateKey:
+                HStack(spacing: 8) {
+                    TextField("Private key path", text: $privateKeyPath)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Browse") {
+                        browsePrivateKey()
+                    }
+                }
+            case .password:
+                SecureField("Password", text: $password)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            TextField("Laravel project path on remote host", text: $projectPath)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("Project name", text: $projectName)
+                .textFieldStyle(.roundedBorder)
+
+            HStack(spacing: 10) {
+                Button {
+                    Task { await testConnection() }
+                } label: {
+                    if isTestingConnection {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text("Test Connection")
+                    }
+                }
+                .disabled(!canSubmit || isTestingConnection)
+
+                if !connectionStatusMessage.isEmpty {
+                    Text(connectionStatusMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.green)
+                }
+            }
+
+            if !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .font(.subheadline)
+                    .foregroundStyle(.red)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                Button("Add Project") {
+                    saveProject()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canSubmit)
+            }
+        }
+        .padding(18)
+        .frame(width: 700)
+        .onAppear {
+            if username.isEmpty {
+                username = NSUserName()
+            }
+            suggestProjectNameIfNeeded()
+        }
+        .onChange(of: host) { _, _ in suggestProjectNameIfNeeded() }
+        .onChange(of: projectPath) { _, _ in suggestProjectNameIfNeeded() }
+    }
+
+    private func saveProject() {
+        guard canSubmit, let portValue = normalizedPort else {
+            errorMessage = "Fill all required SSH fields before saving."
+            return
+        }
+
+        workspaceState.addSSHProject(
+            host: trimmedHost,
+            port: portValue,
+            username: trimmedUsername,
+            projectPath: trimmedProjectPath,
+            authenticationMethod: authenticationMethod,
+            privateKeyPath: trimmedPrivateKeyPath,
+            password: password,
+            displayName: projectName
+        )
+        dismiss()
+    }
+
+    private func browsePrivateKey() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Private Key"
+        panel.prompt = "Use Key"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            privateKeyPath = url.path
+        }
+    }
+
+    private func testConnection() async {
+        guard let portValue = normalizedPort else {
+            errorMessage = "Port must be between 1 and 65535."
+            return
+        }
+
+        isTestingConnection = true
+        errorMessage = ""
+        connectionStatusMessage = ""
+        let result = await workspaceState.testSSHConnection(
+            host: trimmedHost,
+            port: portValue,
+            username: trimmedUsername,
+            projectPath: trimmedProjectPath,
+            authenticationMethod: authenticationMethod,
+            privateKeyPath: trimmedPrivateKeyPath,
+            password: password
+        )
+        isTestingConnection = false
+
+        if result.success {
+            connectionStatusMessage = result.message
+        } else {
+            errorMessage = result.message
+        }
+    }
+
+    private func suggestProjectNameIfNeeded() {
+        guard projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard !trimmedHost.isEmpty else { return }
+        let tail = URL(fileURLWithPath: trimmedProjectPath).lastPathComponent
+        let displayPath = tail.isEmpty ? trimmedProjectPath : tail
+        projectName = displayPath.isEmpty ? "\(trimmedUsername)@\(trimmedHost)" : "\(trimmedUsername)@\(trimmedHost) · \(displayPath)"
+    }
+}
+
+private struct ProjectEditSheet: View {
+    @Environment(WorkspaceState.self) private var workspaceState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var loaded = false
+    @State private var oldProjectID = ""
+    @State private var projectName = ""
+    @State private var connectionKind: ProjectConnectionKind = .local
+
+    @State private var localPath = ""
+
+    @State private var dockerContainerID = ""
+    @State private var dockerContainerName = ""
+    @State private var dockerProjectPath = ""
+
+    @State private var sshHost = ""
+    @State private var sshPort = "22"
+    @State private var sshUsername = ""
+    @State private var sshProjectPath = "/var/www/html"
+    @State private var sshAuthenticationMethod: SSHAuthenticationMethod = .privateKey
+    @State private var sshPrivateKeyPath = ""
+    @State private var sshPassword = ""
+
+    @State private var isTestingSSH = false
+    @State private var testStatusMessage = ""
+    @State private var errorMessage = ""
+
+    private var normalizedSSHPort: Int? {
+        guard let value = Int(sshPort.trimmingCharacters(in: .whitespacesAndNewlines)), (1 ... 65535).contains(value) else {
+            return nil
+        }
+        return value
+    }
+
+    private var canSave: Bool {
+        switch connectionKind {
+        case .local:
+            return !localPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .docker:
+            return !dockerContainerID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                !dockerContainerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                !dockerProjectPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .ssh:
+            guard !sshHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  !sshUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  !sshProjectPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  normalizedSSHPort != nil
+            else {
+                return false
+            }
+            switch sshAuthenticationMethod {
+            case .privateKey:
+                return !sshPrivateKeyPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            case .password:
+                return !sshPassword.isEmpty
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Edit Project")
+                .font(.title3.weight(.semibold))
+
+            if let project = workspaceState.editingProject {
+                Text("Editing: \(project.name)")
+                    .foregroundStyle(.secondary)
+
+                TextField("Project name", text: $projectName)
+                    .textFieldStyle(.roundedBorder)
+
+                switch connectionKind {
+                case .local:
+                    TextField("Local path", text: $localPath)
+                        .textFieldStyle(.roundedBorder)
+                case .docker:
+                    TextField("Container ID", text: $dockerContainerID)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Container Name", text: $dockerContainerName)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Project path in container", text: $dockerProjectPath)
+                        .textFieldStyle(.roundedBorder)
+                case .ssh:
+                    HStack(spacing: 10) {
+                        TextField("Host", text: $sshHost)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Port", text: $sshPort)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 90)
+                        TextField("Username", text: $sshUsername)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 180)
+                    }
+
+                    Picker("Authentication", selection: $sshAuthenticationMethod) {
+                        ForEach(SSHAuthenticationMethod.allCases, id: \.self) { method in
+                            Text(method.displayName).tag(method)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    switch sshAuthenticationMethod {
+                    case .privateKey:
+                        HStack(spacing: 8) {
+                            TextField("Private key path", text: $sshPrivateKeyPath)
+                                .textFieldStyle(.roundedBorder)
+                            Button("Browse") {
+                                browsePrivateKey()
+                            }
+                        }
+                    case .password:
+                        SecureField("Password", text: $sshPassword)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    TextField("Laravel project path on remote host", text: $sshProjectPath)
+                        .textFieldStyle(.roundedBorder)
+
+                    HStack(spacing: 10) {
+                        Button {
+                            Task { await testSSHConnection() }
+                        } label: {
+                            if isTestingSSH {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Text("Test Connection")
+                            }
+                        }
+                        .disabled(!canSave || isTestingSSH)
+
+                        if !testStatusMessage.isEmpty {
+                            Text(testStatusMessage)
+                                .font(.subheadline)
+                                .foregroundStyle(.green)
+                        }
+                    }
+                }
+            } else {
+                Text("Project is no longer available.")
+                    .foregroundStyle(.secondary)
+            }
+
+            if !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .font(.subheadline)
+                    .foregroundStyle(.red)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    workspaceState.cancelEditingProject()
+                    dismiss()
+                }
+                Button("Save") {
+                    save()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canSave)
+            }
+        }
+        .padding(18)
+        .frame(width: 700)
+        .onAppear {
+            loadProjectIfNeeded()
+        }
+        .onDisappear {
+            if workspaceState.isShowingProjectEditSheet {
+                workspaceState.cancelEditingProject()
+            }
+        }
+    }
+
+    private func loadProjectIfNeeded() {
+        guard !loaded, let project = workspaceState.editingProject else { return }
+        loaded = true
+        oldProjectID = project.id
+        projectName = project.name
+
+        switch project.connection {
+        case let .local(path):
+            connectionKind = .local
+            localPath = path
+        case let .docker(config):
+            connectionKind = .docker
+            dockerContainerID = config.containerID
+            dockerContainerName = config.containerName
+            dockerProjectPath = config.projectPath
+        case let .ssh(config):
+            connectionKind = .ssh
+            sshHost = config.host
+            sshPort = String(config.port)
+            sshUsername = config.username
+            sshProjectPath = config.projectPath
+            sshAuthenticationMethod = config.authenticationMethod
+            sshPrivateKeyPath = config.privateKeyPath
+            sshPassword = config.password
+        }
+    }
+
+    private func browsePrivateKey() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Private Key"
+        panel.prompt = "Use Key"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            sshPrivateKeyPath = url.path
+        }
+    }
+
+    private func testSSHConnection() async {
+        guard let port = normalizedSSHPort else {
+            errorMessage = "Port must be between 1 and 65535."
+            return
+        }
+
+        isTestingSSH = true
+        errorMessage = ""
+        testStatusMessage = ""
+        let result = await workspaceState.testSSHConnection(
+            host: sshHost,
+            port: port,
+            username: sshUsername,
+            projectPath: sshProjectPath,
+            authenticationMethod: sshAuthenticationMethod,
+            privateKeyPath: sshPrivateKeyPath,
+            password: sshPassword
+        )
+        isTestingSSH = false
+
+        if result.success {
+            testStatusMessage = result.message
+        } else {
+            errorMessage = result.message
+        }
+    }
+
+    private func save() {
+        guard let current = workspaceState.editingProject else {
+            workspaceState.cancelEditingProject()
+            dismiss()
+            return
+        }
+        guard canSave else {
+            errorMessage = "Please complete all required fields."
+            return
+        }
+
+        let normalizedName = projectName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let updated: WorkspaceProject
+        switch connectionKind {
+        case .local:
+            var project = WorkspaceProject.local(path: localPath, languageID: current.languageID)
+            if !normalizedName.isEmpty {
+                project.name = normalizedName
+            }
+            updated = project
+        case .docker:
+            var project = WorkspaceProject.docker(
+                containerID: dockerContainerID,
+                containerName: dockerContainerName,
+                projectPath: dockerProjectPath,
+                languageID: current.languageID
+            )
+            if !normalizedName.isEmpty {
+                project.name = normalizedName
+            }
+            updated = project
+        case .ssh:
+            guard let port = normalizedSSHPort else {
+                errorMessage = "Port must be between 1 and 65535."
+                return
+            }
+            var project = WorkspaceProject.ssh(
+                host: sshHost,
+                port: port,
+                username: sshUsername,
+                projectPath: sshProjectPath,
+                authenticationMethod: sshAuthenticationMethod,
+                privateKeyPath: sshPrivateKeyPath,
+                password: sshPassword,
+                languageID: current.languageID
+            )
+            if !normalizedName.isEmpty {
+                project.name = normalizedName
+            }
+            updated = project
+        }
+
+        workspaceState.saveEditedProject(oldProjectID: oldProjectID, updatedProject: updated)
+        dismiss()
     }
 }
 

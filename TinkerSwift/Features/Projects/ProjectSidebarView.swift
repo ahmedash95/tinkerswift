@@ -14,12 +14,23 @@ struct ProjectSidebarView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(workspaceState.projects) { project in
-                            Label(project.name, systemImage: project.connection.kind == .docker ? "shippingbox.fill" : "folder")
+                            Label(project.name, systemImage: project.connection.kind.projectSymbolName)
                                 .tag(project.id)
                                 .contextMenu {
+                                    if workspaceState.canEditProject(project) {
+                                        Button("Edit Details") {
+                                            workspaceState.beginEditingProject(project)
+                                        }
+                                    }
                                     if workspaceState.canRenameProject(project) {
                                         Button("Rename") {
                                             workspaceState.beginRenamingProject(project)
+                                        }
+                                    }
+                                    if workspaceState.canDeleteProject(project) {
+                                        Divider()
+                                        Button("Delete", role: .destructive) {
+                                            workspaceState.deleteProject(project)
                                         }
                                     }
                                 }
@@ -43,6 +54,12 @@ struct ProjectSidebarView: View {
                         workspaceState.isShowingDockerProjectSheet = true
                     } label: {
                         Label("Add Docker Project", systemImage: "shippingbox")
+                    }
+
+                    Button {
+                        workspaceState.isShowingSSHProjectSheet = true
+                    } label: {
+                        Label("Add SSH Project", systemImage: "network")
                     }
                 } label: {
                     Label("Add Project", systemImage: "plus")
