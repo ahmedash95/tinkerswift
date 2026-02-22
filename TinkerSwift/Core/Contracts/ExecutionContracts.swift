@@ -19,5 +19,5 @@ protocol CodeFormattingProviding: Sendable {
 }
 
 protocol DefaultProjectInstalling: Sendable {
-    func installDefaultProject(at projectPath: String) async -> LaravelProjectInstallResult
+    func installDefaultProject(at projectPath: String, command: String) async -> LaravelProjectInstallResult
 }

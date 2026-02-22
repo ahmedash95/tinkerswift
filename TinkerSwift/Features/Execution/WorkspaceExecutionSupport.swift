@@ -27,7 +27,9 @@ struct LaravelProjectInstallResult {
 }
 
 actor LaravelProjectInstaller: DefaultProjectInstalling {
-    func installDefaultProject(at projectPath: String) async -> LaravelProjectInstallResult {
+    static let defaultCommand = "laravel new Default --database=sqlite --no-authentication --no-interaction --force"
+
+    func installDefaultProject(at projectPath: String, command: String) async -> LaravelProjectInstallResult {
         let projectURL = URL(fileURLWithPath: projectPath)
         let parentURL = projectURL.deletingLastPathComponent()
 
@@ -58,14 +60,19 @@ actor LaravelProjectInstaller: DefaultProjectInstalling {
         process.currentDirectoryURL = parentURL
         process.environment = environment
         process.executableURL = URL(fileURLWithPath: laravelPath)
-        process.arguments = [
-            "new",
-            projectURL.lastPathComponent,
-            "--database=sqlite",
-            "--no-authentication",
-            "--no-interaction",
-            "--force"
-        ]
+        let resolvedArguments: [String]
+        switch resolvedCommandArguments(from: command, projectFolderName: projectURL.lastPathComponent) {
+        case .success(let arguments):
+            resolvedArguments = arguments
+        case .failure(let error):
+            return LaravelProjectInstallResult(
+                stdout: "",
+                stderr: error.localizedDescription,
+                exitCode: 1,
+                wasSuccessful: false
+            )
+        }
+        process.arguments = resolvedArguments
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
@@ -104,5 +111,116 @@ actor LaravelProjectInstaller: DefaultProjectInstalling {
             exitCode: output.terminationStatus,
             wasSuccessful: wasSuccessful
         )
+    }
+
+    private func resolvedCommandArguments(from command: String, projectFolderName: String) -> Result<[String], CommandLineValidationError> {
+        let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return .failure(
+                CommandLineValidationError(
+                    message: "Command cannot be empty. Example: `laravel new Default --database=sqlite --no-interaction --force`"
+                )
+            )
+        }
+
+        let parsedTokens: [String]
+        switch ShellCommandTokenizer.tokenize(trimmed) {
+        case .success(let tokens):
+            parsedTokens = tokens
+        case .failure(let error):
+            return .failure(CommandLineValidationError(message: "Invalid command: \(error.localizedDescription)"))
+        }
+
+        var arguments = parsedTokens
+        if arguments.first?.lowercased() == "laravel" {
+            arguments.removeFirst()
+        }
+
+        guard !arguments.isEmpty else {
+            return .failure(CommandLineValidationError(message: "Command must include arguments after `laravel`."))
+        }
+
+        guard arguments[0] == "new" else {
+            return .failure(CommandLineValidationError(message: "Command must start with `new` (or `laravel new`)."))
+        }
+
+        if arguments.count == 1 {
+            arguments.append(projectFolderName)
+        } else if arguments[1].hasPrefix("-") {
+            arguments.insert(projectFolderName, at: 1)
+        } else {
+            arguments[1] = projectFolderName
+        }
+
+        return .success(arguments)
+    }
+}
+
+private enum ShellCommandTokenizer {
+    static func tokenize(_ input: String) -> Result<[String], CommandLineValidationError> {
+        var tokens: [String] = []
+        var current = ""
+        var inSingleQuotes = false
+        var inDoubleQuotes = false
+        var isEscaping = false
+
+        for character in input {
+            if isEscaping {
+                current.append(character)
+                isEscaping = false
+                continue
+            }
+
+            if character == "\\" {
+                if inSingleQuotes {
+                    current.append(character)
+                } else {
+                    isEscaping = true
+                }
+                continue
+            }
+
+            if character == "'" && !inDoubleQuotes {
+                inSingleQuotes.toggle()
+                continue
+            }
+
+            if character == "\"" && !inSingleQuotes {
+                inDoubleQuotes.toggle()
+                continue
+            }
+
+            if character.isWhitespace && !inSingleQuotes && !inDoubleQuotes {
+                if !current.isEmpty {
+                    tokens.append(current)
+                    current = ""
+                }
+                continue
+            }
+
+            current.append(character)
+        }
+
+        if isEscaping {
+            return .failure(CommandLineValidationError(message: "Trailing escape character."))
+        }
+        if inSingleQuotes || inDoubleQuotes {
+            return .failure(CommandLineValidationError(message: "Unterminated quote."))
+        }
+        if !current.isEmpty {
+            tokens.append(current)
+        }
+        if tokens.isEmpty {
+            return .failure(CommandLineValidationError(message: "No command tokens found."))
+        }
+        return .success(tokens)
+    }
+}
+
+private struct CommandLineValidationError: LocalizedError {
+    let message: String
+
+    var errorDescription: String? {
+        message
     }
 }

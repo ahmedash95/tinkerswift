@@ -264,6 +264,7 @@ return $users->toJson();
     var isRunning = false
     var isShowingDefaultProjectInstallSheet = false
     var isInstallingDefaultProject = false
+    var defaultProjectInstallCommand = LaravelProjectInstaller.defaultCommand
     var defaultProjectInstallOutput = ""
     var defaultProjectInstallErrorMessage = ""
     private var pendingRestartAfterStop = false
@@ -594,13 +595,14 @@ return $users->toJson();
 
     func installDefaultProject() {
         guard !isInstallingDefaultProject else { return }
+        let installCommand = defaultProjectInstallCommand
 
         isInstallingDefaultProject = true
         defaultProjectInstallOutput = ""
         defaultProjectInstallErrorMessage = ""
 
         Task { [weak self] in
-            await self?.performDefaultProjectInstallation()
+            await self?.performDefaultProjectInstallation(command: installCommand)
         }
     }
 
@@ -910,8 +912,11 @@ return $users->toJson();
         }
     }
 
-    private func performDefaultProjectInstallation() async {
-        let result = await defaultProjectInstaller.installDefaultProject(at: defaultProject.path)
+    private func performDefaultProjectInstallation(command: String) async {
+        let result = await defaultProjectInstaller.installDefaultProject(
+            at: defaultProject.path,
+            command: command
+        )
 
         defaultProjectInstallOutput = result.combinedOutput
         isInstallingDefaultProject = false

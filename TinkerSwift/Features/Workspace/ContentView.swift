@@ -695,12 +695,19 @@ private struct DefaultProjectInstallSheet: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            Text("laravel new Default --database=sqlite --no-authentication --no-interaction --force")
+            TextField(
+                "laravel new Default --database=sqlite --no-interaction --force",
+                text: $workspaceState.defaultProjectInstallCommand,
+                axis: .vertical
+            )
                 .font(.system(.caption, design: .monospaced))
-                .textSelection(.enabled)
-                .padding(8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+                .lineLimit(2 ... 4)
+                .textFieldStyle(.roundedBorder)
+                .disabled(workspaceState.isInstallingDefaultProject)
+
+            Text("Edit command flags if your local Laravel installer supports different options.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             if workspaceState.isInstallingDefaultProject {
                 HStack(spacing: 10) {
