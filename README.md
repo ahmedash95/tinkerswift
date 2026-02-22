@@ -4,6 +4,10 @@ TinkerSwift is a native macOS app written in Swift/SwiftUI, focused on PHP and L
 
 ![App Screenshot](screenshot.jpeg)
 
+## Download / Install
+
+Download the latest build from the [Releases page](https://github.com/ahmedash95/tinkerswift/releases).
+
 ## Current Focus
 
 - PHP projects, especially Laravel apps
@@ -74,4 +78,3 @@ TinkerSwift/
    - `xcodegen generate`
 3. Run a debug build before opening a PR:
    - `xcodebuild -project TinkerSwift.xcodeproj -scheme TinkerSwift -configuration Debug -derivedDataPath .build-xcode build`
-
