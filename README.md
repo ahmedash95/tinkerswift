@@ -2,6 +2,8 @@
 
 TinkerSwift is a native macOS app written in Swift/SwiftUI, focused on PHP and Laravel workflows as a lightweight playground .
 
+![App Screenshot](screenshot.jpeg)
+
 ## Current Focus
 
 - PHP projects, especially Laravel apps
