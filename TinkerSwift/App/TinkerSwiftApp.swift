@@ -124,7 +124,6 @@ struct WorkspaceRootView: View {
         ContentView()
             .environment(appModel)
             .environment(workspaceState)
-            .preferredColorScheme(appModel.appTheme.colorScheme)
             .sheet(isPresented: $isShowingOnboarding) {
                 OnboardingSheet(isPresented: $isShowingOnboarding)
                     .environment(appModel)
@@ -157,6 +156,7 @@ struct TinkerSwiftApp: App {
             WorkspaceRootView(container: container)
                 .onAppear {
                     appDelegate.setAppModel(container.appModel)
+                    container.appModel.appTheme.applyAppearance()
                 }
         }
         .commands {
@@ -166,7 +166,6 @@ struct TinkerSwiftApp: App {
         Settings {
             SettingsView()
                 .environment(container.appModel)
-                .preferredColorScheme(container.appModel.appTheme.colorScheme)
         }
     }
 }

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -19,6 +20,18 @@ enum AppTheme: String, CaseIterable, Sendable {
         case .system: return nil
         case .light: return .light
         case .dark: return .dark
+        }
+    }
+
+    @MainActor
+    func applyAppearance() {
+        switch self {
+        case .system:
+            NSApp?.appearance = nil
+        case .light:
+            NSApp?.appearance = NSAppearance(named: .aqua)
+        case .dark:
+            NSApp?.appearance = NSAppearance(named: .darkAqua)
         }
     }
 }

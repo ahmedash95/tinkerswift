@@ -42,7 +42,10 @@ final class AppModel {
     private var persistedProjectID = ""
 
     var appTheme: AppTheme {
-        didSet { persistSettings() }
+        didSet {
+            appTheme.applyAppearance()
+            persistSettings()
+        }
     }
 
     var appUIScale: Double {
@@ -130,6 +133,7 @@ final class AppModel {
         let snapshot = persistenceStore.load()
         let selectedProjectID = snapshot.selectedProjectID.trimmingCharacters(in: .whitespacesAndNewlines)
         appTheme = snapshot.settings.appTheme
+        snapshot.settings.appTheme.applyAppearance()
         appUIScale = Self.sanitizedScale(snapshot.settings.appUIScale)
         hasCompletedOnboarding = snapshot.settings.hasCompletedOnboarding
         showLineNumbers = snapshot.settings.showLineNumbers
