@@ -64,7 +64,7 @@ private struct EditorSettingsTab: View {
                     )
                 }
             } header: {
-                Label("Editor", systemImage: "text.cursor")
+                Label("Editor", systemImage: "chevron.left.forwardslash.chevron.right")
             }
 
             Section {
@@ -285,37 +285,34 @@ private struct BinaryPathRow: View {
     let browseAction: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 26, height: 26)
-                    .background(tint.gradient, in: RoundedRectangle(cornerRadius: 6))
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(tint.gradient, in: RoundedRectangle(cornerRadius: 6))
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.body)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.body)
 
-                    Text(description)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 8) {
+                    TextField("", text: $path, prompt: Text("/usr/local/bin/...").foregroundStyle(.quaternary))
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12, design: .monospaced))
+
+                    Button(action: browseAction) {
+                        Text("Browse…")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
             }
-
-            HStack(spacing: 8) {
-                TextField("Path to executable…", text: $path)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
-
-                Button(action: browseAction) {
-                    Text("Browse…")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-            }
-            .padding(.leading, 38)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }
