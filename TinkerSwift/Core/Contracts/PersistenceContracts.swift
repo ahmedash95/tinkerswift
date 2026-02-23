@@ -1,6 +1,43 @@
+import AppKit
 import Foundation
+import SwiftUI
+
+enum AppTheme: String, CaseIterable, Sendable {
+    case system
+    case light
+    case dark
+
+    var label: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+
+    @MainActor
+    func applyAppearance() {
+        switch self {
+        case .system:
+            NSApp?.appearance = nil
+        case .light:
+            NSApp?.appearance = NSAppearance(named: .aqua)
+        case .dark:
+            NSApp?.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+}
 
 struct AppSettings: Sendable {
+    var appTheme: AppTheme
     var appUIScale: Double
     var hasCompletedOnboarding: Bool
     var showLineNumbers: Bool

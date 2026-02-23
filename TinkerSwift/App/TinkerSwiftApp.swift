@@ -156,6 +156,7 @@ struct TinkerSwiftApp: App {
             WorkspaceRootView(container: container)
                 .onAppear {
                     appDelegate.setAppModel(container.appModel)
+                    container.appModel.appTheme.applyAppearance()
                 }
         }
         .commands {

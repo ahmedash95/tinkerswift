@@ -28,6 +28,34 @@ private struct EditorSettingsTab: View {
 
         Form {
             Section {
+                HStack(spacing: 12) {
+                    Image(systemName: "circle.lefthalf.filled")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 26, height: 26)
+                        .background(Color.gray.gradient, in: RoundedRectangle(cornerRadius: 6))
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Appearance")
+                            .font(.body)
+                        Text("Choose how the app looks.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Picker("", selection: $appModel.appTheme) {
+                        ForEach(AppTheme.allCases, id: \.self) { theme in
+                            Text(theme.label).tag(theme)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 200)
+                }
+                .padding(.vertical, 2)
+
                 Toggle(isOn: $appModel.showLineNumbers) {
                     SettingsLabel(
                         "Show Line Numbers",
