@@ -56,6 +56,12 @@ private struct TinkerSwiftCommands: Commands {
             .disabled(runCodeAction == nil)
         }
 
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates...") {
+                NSApp.sendAction(#selector(TinkerSwiftAppDelegate.checkForUpdates(_:)), to: nil, from: nil)
+            }
+        }
+
         CommandGroup(after: .newItem) {
             Button("New Tab") {
                 NotificationCenter.default.post(name: .tinkerSwiftNewTabRequested, object: NSApp.keyWindow)

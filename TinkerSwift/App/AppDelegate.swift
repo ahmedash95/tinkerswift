@@ -1,4 +1,5 @@
 import AppKit
+import Sparkle
 import SwiftUI
 
 extension Notification.Name {
@@ -10,12 +11,18 @@ extension Notification.Name {
 final class TinkerSwiftAppDelegate: NSObject, NSApplicationDelegate {
     private weak var appModel: AppModel?
     private var externalWindowControllers: [NSWindowController] = []
+    private var updaterController: SPUStandardUpdaterController?
 
     func setAppModel(_ appModel: AppModel) {
         self.appModel = appModel
     }
 
+    @objc func checkForUpdates(_ sender: Any?) {
+        updaterController?.checkForUpdates(sender)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleNewTabRequest(_:)),
