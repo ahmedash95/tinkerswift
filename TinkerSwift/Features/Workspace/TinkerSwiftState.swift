@@ -274,6 +274,7 @@ return $users->toJson();
     private var pendingRestartAfterStop = false
     private var isRestoringProjectDraft = false
     private var codeRevision: UInt64 = 0
+    private var cachedOutputByProjectID: [String: CachedProjectOutput] = [:]
     var lastRunMetrics: RunMetrics?
     var resultViewMode: ResultViewMode = .pretty
     var rawStreamMode: RawStreamMode = .output
@@ -291,10 +292,16 @@ return $users->toJson();
         didSet {
             appModel.setLastSelectedProjectID(selectedProjectID)
             if selectedProjectID != oldValue {
+                cachedOutputByProjectID[oldValue] = CachedProjectOutput(
+                    execution: latestExecution,
+                    resultMessage: resultMessage,
+                    metrics: lastRunMetrics
+                )
                 appModel.setEditorDraft(code, for: oldValue)
                 evaluateDefaultProjectSelection(showPromptIfMissing: true)
                 selectedRunHistoryItemID = nil
                 loadCodeDraftForCurrentProject()
+                restoreOutputForCurrentProject()
             }
             updateRunHistoryWindowTitle()
         }
@@ -1028,6 +1035,18 @@ return $users->toJson();
         isRestoringProjectDraft = false
     }
 
+    private func restoreOutputForCurrentProject() {
+        if let cached = cachedOutputByProjectID[selectedProjectID] {
+            latestExecution = cached.execution
+            resultMessage = cached.resultMessage
+            lastRunMetrics = cached.metrics
+        } else {
+            latestExecution = nil
+            resultMessage = "Press Run to execute code."
+            lastRunMetrics = nil
+        }
+    }
+
     private func closeRunHistoryWindow() {
         historyWindowController?.close()
         historyWindowController = nil
@@ -1104,4 +1123,10 @@ return $users->toJson();
             .standardizedFileURL
             .absoluteString
     }
+}
+
+private struct CachedProjectOutput {
+    let execution: PHPExecutionResult?
+    let resultMessage: String
+    let metrics: RunMetrics?
 }
