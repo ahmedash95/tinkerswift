@@ -36,7 +36,7 @@ targets:
         product: Sparkle
     settings:
       base:
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon.icon
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_HARDENED_RUNTIME: YES
         PRODUCT_NAME: TinkerSwift
         CODE_SIGN_STYLE: Automatic
