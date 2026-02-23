@@ -41,6 +41,10 @@ final class AppModel {
     private let draftService: EditorDraftService
     private var persistedProjectID = ""
 
+    var appTheme: AppTheme {
+        didSet { persistSettings() }
+    }
+
     var appUIScale: Double {
         didSet {
             let normalized = Self.sanitizedScale(appUIScale)
@@ -125,6 +129,7 @@ final class AppModel {
 
         let snapshot = persistenceStore.load()
         let selectedProjectID = snapshot.selectedProjectID.trimmingCharacters(in: .whitespacesAndNewlines)
+        appTheme = snapshot.settings.appTheme
         appUIScale = Self.sanitizedScale(snapshot.settings.appUIScale)
         hasCompletedOnboarding = snapshot.settings.hasCompletedOnboarding
         showLineNumbers = snapshot.settings.showLineNumbers
@@ -185,6 +190,7 @@ final class AppModel {
     private func persistSettings() {
         persistenceStore.save(
             settings: AppSettings(
+                appTheme: appTheme,
                 appUIScale: appUIScale,
                 hasCompletedOnboarding: hasCompletedOnboarding,
                 showLineNumbers: showLineNumbers,

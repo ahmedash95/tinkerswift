@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
     private enum DefaultsKey {
+        static let appTheme = "app.theme"
         static let appUIScale = "app.uiScale"
         static let onboardingCompleted = "app.onboardingCompleted"
         static let showLineNumbers = "editor.showLineNumbers"
@@ -55,6 +56,7 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
         defaults.removeObject(forKey: DefaultsKey.legacyEditorFontSize)
 
         let settings = AppSettings(
+            appTheme: AppTheme(rawValue: defaults.string(forKey: DefaultsKey.appTheme) ?? "") ?? .system,
             appUIScale: normalizedScale,
             hasCompletedOnboarding: defaults.object(forKey: DefaultsKey.onboardingCompleted) as? Bool ?? false,
             showLineNumbers: defaults.object(forKey: DefaultsKey.showLineNumbers) as? Bool ?? true,
@@ -130,6 +132,7 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
     }
 
     func save(settings: AppSettings) {
+        defaults.set(settings.appTheme.rawValue, forKey: DefaultsKey.appTheme)
         defaults.set(sanitizedScale(settings.appUIScale), forKey: DefaultsKey.appUIScale)
         defaults.set(settings.hasCompletedOnboarding, forKey: DefaultsKey.onboardingCompleted)
         defaults.set(settings.showLineNumbers, forKey: DefaultsKey.showLineNumbers)
