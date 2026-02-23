@@ -14,9 +14,11 @@ struct SettingsView: View {
                     Label("Binaries", systemImage: "terminal")
                 }
         }
-        .frame(width: 860, height: 680)
+        .frame(width: 680, height: 520)
     }
 }
+
+// MARK: - Editor Settings
 
 private struct EditorSettingsTab: View {
     @Environment(AppModel.self) private var appModel
@@ -25,70 +27,86 @@ private struct EditorSettingsTab: View {
         @Bindable var appModel = appModel
 
         Form {
-            Section(
-                header: Text("Editor"),
-                footer: Text("These options control how code is rendered and navigated while you type.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            ) {
-                SettingsToggleRow(
-                    title: "Show Line Numbers",
-                    description: "Display line numbers in the editor gutter.",
-                    isOn: $appModel.showLineNumbers
-                )
-                SettingsToggleRow(
-                    title: "Wrap Lines",
-                    description: "Wrap long lines to fit the visible editor width.",
-                    isOn: $appModel.wrapLines
-                )
-                SettingsToggleRow(
-                    title: "Highlight Current Line",
-                    description: "Keep the active cursor line visually highlighted.",
-                    isOn: $appModel.highlightSelectedLine
-                )
-                SettingsToggleRow(
-                    title: "Syntax Highlighting",
-                    description: "Colorize source code by language grammar.",
-                    isOn: $appModel.syntaxHighlighting
-                )
+            Section {
+                Toggle(isOn: $appModel.showLineNumbers) {
+                    SettingsLabel(
+                        "Show Line Numbers",
+                        subtitle: "Display line numbers in the editor gutter.",
+                        icon: "list.number",
+                        tint: .blue
+                    )
+                }
+
+                Toggle(isOn: $appModel.wrapLines) {
+                    SettingsLabel(
+                        "Wrap Lines",
+                        subtitle: "Wrap long lines to fit the visible editor width.",
+                        icon: "text.word.spacing",
+                        tint: .orange
+                    )
+                }
+
+                Toggle(isOn: $appModel.highlightSelectedLine) {
+                    SettingsLabel(
+                        "Highlight Current Line",
+                        subtitle: "Keep the active cursor line visually highlighted.",
+                        icon: "pencil.line",
+                        tint: .yellow
+                    )
+                }
+
+                Toggle(isOn: $appModel.syntaxHighlighting) {
+                    SettingsLabel(
+                        "Syntax Highlighting",
+                        subtitle: "Colorize source code by language grammar.",
+                        icon: "paintbrush",
+                        tint: .purple
+                    )
+                }
+            } header: {
+                Label("Editor", systemImage: "text.cursor")
             }
 
-            Section(
-                header: Text("Code Intelligence"),
-                footer: Text("Enable Language Server Protocol features such as completion and trigger behavior.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            ) {
-                SettingsToggleRow(
-                    title: "LSP Completion",
-                    description: "Enable language-server-based completion suggestions.",
-                    isOn: $appModel.lspCompletionEnabled
-                )
-                SettingsToggleRow(
-                    title: "LSP Auto Trigger",
-                    description: "Automatically refresh completions after typing pauses.",
-                    isOn: $appModel.lspAutoTriggerEnabled
-                )
+            Section {
+                Toggle(isOn: $appModel.lspCompletionEnabled) {
+                    SettingsLabel(
+                        "LSP Completion",
+                        subtitle: "Enable language-server-based completion suggestions.",
+                        icon: "sparkles",
+                        tint: .mint
+                    )
+                }
+
+                Toggle(isOn: $appModel.lspAutoTriggerEnabled) {
+                    SettingsLabel(
+                        "LSP Auto Trigger",
+                        subtitle: "Automatically refresh completions after typing pauses.",
+                        icon: "bolt.fill",
+                        tint: .cyan
+                    )
+                }
+            } header: {
+                Label("Code Intelligence", systemImage: "brain")
             }
 
-            Section(
-                header: Text("Run"),
-                footer: Text("Formatting runs in background with Laravel Pint and never blocks execution.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            ) {
-                SettingsToggleRow(
-                    title: "Auto Format On Run",
-                    description: "Format code automatically each time you run.",
-                    isOn: $appModel.autoFormatOnRunEnabled
-                )
+            Section {
+                Toggle(isOn: $appModel.autoFormatOnRunEnabled) {
+                    SettingsLabel(
+                        "Auto Format On Run",
+                        subtitle: "Format code automatically each time you run.",
+                        icon: "paintbrush.pointed",
+                        tint: .green
+                    )
+                }
+            } header: {
+                Label("Run", systemImage: "play.fill")
             }
         }
         .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .background(Color(nsColor: .controlBackgroundColor))
     }
 }
+
+// MARK: - Binary Settings
 
 private struct BinarySettingsTab: View {
     @Environment(AppModel.self) private var appModel
@@ -99,15 +117,12 @@ private struct BinarySettingsTab: View {
         @Bindable var appModel = appModel
 
         Form {
-            Section(
-                header: Text("Executable Paths"),
-                footer: Text("Set the executable path each tool should use.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            ) {
+            Section {
                 BinaryPathRow(
                     title: AppBinaryTool.phpactor.displayName,
-                    description: "Language server executable used for PHP completion.",
+                    description: "Language server for PHP completion.",
+                    icon: "server.rack",
+                    tint: .blue,
                     path: pathBinding(tool: .phpactor, override: $appModel.lspServerPathOverride),
                     browseAction: {
                         browseForExecutable { selectedPath in
@@ -118,7 +133,9 @@ private struct BinarySettingsTab: View {
 
                 BinaryPathRow(
                     title: AppBinaryTool.php.displayName,
-                    description: "PHP runtime used for code execution and tooling.",
+                    description: "PHP runtime for code execution.",
+                    icon: "chevron.left.forwardslash.chevron.right",
+                    tint: .indigo,
                     path: pathBinding(tool: .php, override: $appModel.phpBinaryPathOverride),
                     browseAction: {
                         browseForExecutable { selectedPath in
@@ -129,7 +146,9 @@ private struct BinarySettingsTab: View {
 
                 BinaryPathRow(
                     title: AppBinaryTool.docker.displayName,
-                    description: "Docker CLI used for container project support.",
+                    description: "Docker CLI for container projects.",
+                    icon: "shippingbox",
+                    tint: .cyan,
                     path: pathBinding(tool: .docker, override: $appModel.dockerBinaryPathOverride),
                     browseAction: {
                         browseForExecutable { selectedPath in
@@ -140,7 +159,9 @@ private struct BinarySettingsTab: View {
 
                 BinaryPathRow(
                     title: AppBinaryTool.laravel.displayName,
-                    description: "Laravel installer used by project templates.",
+                    description: "Laravel installer for project templates.",
+                    icon: "hammer",
+                    tint: .red,
                     path: pathBinding(tool: .laravel, override: $appModel.laravelBinaryPathOverride),
                     browseAction: {
                         browseForExecutable { selectedPath in
@@ -148,11 +169,11 @@ private struct BinarySettingsTab: View {
                         }
                     }
                 )
+            } header: {
+                Label("Executable Paths", systemImage: "folder")
             }
         }
         .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .background(Color(nsColor: .controlBackgroundColor))
         .task {
             await loadInitialPaths()
         }
@@ -220,60 +241,80 @@ private struct BinarySettingsTab: View {
     }
 }
 
-private struct SettingsToggleRow: View {
+// MARK: - Reusable Components
+
+private struct SettingsLabel: View {
     let title: String
-    let description: String
-    @Binding var isOn: Bool
+    let subtitle: String
+    let icon: String
+    let tint: Color
+
+    init(_ title: String, subtitle: String, icon: String, tint: Color) {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.tint = tint
+    }
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(tint.gradient, in: RoundedRectangle(cornerRadius: 6))
+
+            VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.subheadline.weight(.medium))
-                Text(description)
-                    .font(.caption)
+                    .font(.body)
+
+                Text(subtitle)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            Spacer()
-            Toggle("", isOn: $isOn)
-                .labelsHidden()
         }
-        .padding(.vertical, 2)
     }
 }
 
 private struct BinaryPathRow: View {
     let title: String
     let description: String
+    let icon: String
+    let tint: Color
     @Binding var path: String
     let browseAction: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                Text(description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background(tint.gradient, in: RoundedRectangle(cornerRadius: 6))
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.body)
+
+                    Text(description)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
 
-            Spacer(minLength: 12)
-
             HStack(spacing: 8) {
-                TextField("", text: $path)
+                TextField("Path to executable…", text: $path)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 380)
-                    .multilineTextAlignment(.leading)
+                    .font(.system(.body, design: .monospaced))
 
                 Button(action: browseAction) {
-                    Text("Browse")
-                        .frame(minWidth: 72)
+                    Text("Browse…")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
             }
-            .frame(maxWidth: 470, alignment: .trailing)
+            .padding(.leading, 38)
         }
         .padding(.vertical, 4)
     }
