@@ -25,6 +25,12 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Project
+        run: xcodegen generate
+
       - name: Resolve Swift package dependencies
         run: |
           xcodebuild \
