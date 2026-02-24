@@ -11,7 +11,7 @@ final class AppContainer {
     private let defaultProjectInstaller: any DefaultProjectInstalling
 
     init(
-        persistenceStore: any WorkspacePersistenceStore = UserDefaultsWorkspaceStore(),
+        persistenceStore: any WorkspacePersistenceStore = SQLiteWorkspaceStore(),
         phpExecutionProvider: any CodeExecutionProviding = PHPExecutionRunner(),
         codeFormatterProvider: any CodeFormattingProviding = PintCodeFormatter(),
         defaultProjectInstaller: any DefaultProjectInstalling = LaravelProjectInstaller()

@@ -59,6 +59,19 @@ struct WorkspacePersistenceSnapshot: Sendable {
     var projects: [WorkspaceProject]
     var runHistory: [ProjectRunHistoryItem]
     var projectDraftsByProjectID: [String: String]
+    var projectOutputCacheByProjectID: [String: ProjectOutputCacheEntry]
+    var startupRecoveryMessage: String?
+}
+
+struct ProjectOutputCacheEntry: Codable, Sendable {
+    var command: String
+    var stdout: String
+    var stderr: String
+    var exitCode: Int32
+    var durationMs: Double?
+    var peakMemoryBytes: UInt64?
+    var wasStopped: Bool
+    var resultMessage: String
 }
 
 @MainActor
@@ -68,5 +81,6 @@ protocol WorkspacePersistenceStore {
     func save(projects: [WorkspaceProject])
     func save(runHistory: [ProjectRunHistoryItem])
     func save(projectDraftsByProjectID: [String: String])
+    func save(projectOutputCacheByProjectID: [String: ProjectOutputCacheEntry])
     func save(selectedProjectID: String)
 }

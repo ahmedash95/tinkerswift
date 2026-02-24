@@ -109,6 +109,7 @@ struct WorkspaceRootView: View {
     private let appModel: AppModel
     @State private var workspaceState: WorkspaceState
     @State private var isShowingOnboarding = false
+    @State private var isShowingStartupRecoveryAlert = false
 
     init(appModel: AppModel) {
         self.appModel = appModel
@@ -129,15 +130,26 @@ struct WorkspaceRootView: View {
                     .environment(appModel)
                     .environment(workspaceState)
             }
+            .alert("Failed to Read Application Data", isPresented: $isShowingStartupRecoveryAlert) {
+                Button("Start Over") {
+                    appModel.dismissStartupRecoveryMessage()
+                }
+            } message: {
+                Text(appModel.startupRecoveryMessage ?? "")
+            }
             .onAppear {
                 if !appModel.hasCompletedOnboarding {
                     isShowingOnboarding = true
                 }
+                isShowingStartupRecoveryAlert = appModel.startupRecoveryMessage != nil
             }
             .onChange(of: appModel.hasCompletedOnboarding) { _, completed in
                 if completed {
                     isShowingOnboarding = false
                 }
+            }
+            .onChange(of: appModel.startupRecoveryMessage) { _, message in
+                isShowingStartupRecoveryAlert = message != nil
             }
     }
 }

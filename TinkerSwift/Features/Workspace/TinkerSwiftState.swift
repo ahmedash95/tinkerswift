@@ -40,6 +40,7 @@ final class AppModel {
     private let runHistoryService: RunHistoryService
     private let draftService: EditorDraftService
     private var persistedProjectID = ""
+    var startupRecoveryMessage: String?
 
     var appTheme: AppTheme {
         didSet {
@@ -119,8 +120,12 @@ final class AppModel {
         didSet { persistenceStore.save(projectDraftsByProjectID: projectDraftsByProjectID) }
     }
 
+    var projectOutputCacheByProjectID: [String: ProjectOutputCacheEntry] {
+        didSet { persistenceStore.save(projectOutputCacheByProjectID: projectOutputCacheByProjectID) }
+    }
+
     init(
-        persistenceStore: any WorkspacePersistenceStore = UserDefaultsWorkspaceStore(),
+        persistenceStore: any WorkspacePersistenceStore = SQLiteWorkspaceStore(),
         projectCatalogService: ProjectCatalogService = ProjectCatalogService(),
         runHistoryService: RunHistoryService = RunHistoryService(),
         draftService: EditorDraftService = EditorDraftService()
@@ -152,6 +157,8 @@ final class AppModel {
         projects = projectCatalogService.mergedProjects(snapshot.projects, selectedProjectID: selectedProjectID)
         runHistory = snapshot.runHistory
         projectDraftsByProjectID = snapshot.projectDraftsByProjectID
+        projectOutputCacheByProjectID = snapshot.projectOutputCacheByProjectID
+        startupRecoveryMessage = snapshot.startupRecoveryMessage
     }
 
     var scale: CGFloat {
@@ -189,6 +196,25 @@ final class AppModel {
 
     func setEditorDraft(_ code: String, for projectID: String) {
         projectDraftsByProjectID = draftService.settingDraft(code, for: projectID, draftsByProjectID: projectDraftsByProjectID)
+    }
+
+    func cachedOutput(for projectID: String) -> ProjectOutputCacheEntry? {
+        let normalizedProjectID = projectID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedProjectID.isEmpty else { return nil }
+        return projectOutputCacheByProjectID[normalizedProjectID]
+    }
+
+    func setCachedOutput(_ output: ProjectOutputCacheEntry?, for projectID: String) {
+        let normalizedProjectID = projectID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedProjectID.isEmpty else { return }
+
+        var next = projectOutputCacheByProjectID
+        next[normalizedProjectID] = output
+        projectOutputCacheByProjectID = next
+    }
+
+    func dismissStartupRecoveryMessage() {
+        startupRecoveryMessage = nil
     }
 
     private func persistSettings() {
@@ -284,7 +310,6 @@ return $users->toJson();
     private var pendingRestartAfterStop = false
     private var isRestoringProjectDraft = false
     private var codeRevision: UInt64 = 0
-    private var cachedOutputByProjectID: [String: CachedProjectOutput] = [:]
     var lastRunMetrics: RunMetrics?
     var resultViewMode: ResultViewMode = .pretty
     var rawStreamMode: RawStreamMode = .output
@@ -302,11 +327,7 @@ return $users->toJson();
         didSet {
             appModel.setLastSelectedProjectID(selectedProjectID)
             if selectedProjectID != oldValue {
-                cachedOutputByProjectID[oldValue] = CachedProjectOutput(
-                    execution: latestExecution,
-                    resultMessage: resultMessage,
-                    metrics: lastRunMetrics
-                )
+                persistOutputCache(for: oldValue)
                 appModel.setEditorDraft(code, for: oldValue)
                 evaluateDefaultProjectSelection(showPromptIfMissing: true)
                 selectedRunHistoryItemID = nil
@@ -342,6 +363,7 @@ return $users->toJson();
             selectedProjectID = savedProjectID
         }
         loadCodeDraftForCurrentProject()
+        restoreOutputForCurrentProject()
         evaluateDefaultProjectSelection(showPromptIfMissing: selectedProjectID == defaultProject.id)
     }
 
@@ -972,6 +994,7 @@ return $users->toJson();
                     peakMemoryBytes: execution.peakMemoryBytes
                 )
                 resultMessage = "Execution stopped."
+                persistOutputCache(for: selectedProjectID)
                 return
             }
 
@@ -980,6 +1003,7 @@ return $users->toJson();
                 peakMemoryBytes: execution.peakMemoryBytes
             )
             resultMessage = "Execution completed."
+            persistOutputCache(for: selectedProjectID)
             return
         }
     }
@@ -1046,15 +1070,51 @@ return $users->toJson();
     }
 
     private func restoreOutputForCurrentProject() {
-        if let cached = cachedOutputByProjectID[selectedProjectID] {
-            latestExecution = cached.execution
+        if let cached = appModel.cachedOutput(for: selectedProjectID) {
+            latestExecution = PHPExecutionResult(
+                command: cached.command,
+                stdout: cached.stdout,
+                stderr: cached.stderr,
+                exitCode: cached.exitCode,
+                durationMs: cached.durationMs,
+                peakMemoryBytes: cached.peakMemoryBytes,
+                wasStopped: cached.wasStopped
+            )
             resultMessage = cached.resultMessage
-            lastRunMetrics = cached.metrics
+            if cached.durationMs != nil || cached.peakMemoryBytes != nil {
+                lastRunMetrics = RunMetrics(
+                    durationMs: cached.durationMs,
+                    peakMemoryBytes: cached.peakMemoryBytes
+                )
+            } else {
+                lastRunMetrics = nil
+            }
         } else {
             latestExecution = nil
             resultMessage = "Press Run to execute code."
             lastRunMetrics = nil
         }
+    }
+
+    private func persistOutputCache(for projectID: String) {
+        guard let execution = latestExecution else {
+            appModel.setCachedOutput(nil, for: projectID)
+            return
+        }
+
+        appModel.setCachedOutput(
+            ProjectOutputCacheEntry(
+                command: execution.command,
+                stdout: execution.stdout,
+                stderr: execution.stderr,
+                exitCode: execution.exitCode,
+                durationMs: execution.durationMs,
+                peakMemoryBytes: execution.peakMemoryBytes,
+                wasStopped: execution.wasStopped,
+                resultMessage: resultMessage
+            ),
+            for: projectID
+        )
     }
 
     private func closeRunHistoryWindow() {
@@ -1133,10 +1193,4 @@ return $users->toJson();
             .standardizedFileURL
             .absoluteString
     }
-}
-
-private struct CachedProjectOutput {
-    let execution: PHPExecutionResult?
-    let resultMessage: String
-    let metrics: RunMetrics?
 }

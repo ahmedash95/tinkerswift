@@ -12,25 +12,37 @@
 		069B88FDC7F79B121A20CA90 /* WorkspaceDataServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D906D78C834B088D694CC31 /* WorkspaceDataServices.swift */; };
 		07BF35E95718AF8389E7C14A /* PersistenceContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2126F5DDD177527BCAC52E0C /* PersistenceContracts.swift */; };
 		08A2E195C8ADC0D61D49E04A /* WorkspaceWindowFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584BDC99B811332EF83715A1 /* WorkspaceWindowFactory.swift */; };
+		0D01AB11637C1AB5C5409326 /* SQLiteSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4475E7AC72053E689F6EB8DB /* SQLiteSupport.swift */; };
 		0DA9660C00F94AD18C7E6A0A /* AppKitCodeEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CBCB1FAF921EFBA6157963E /* AppKitCodeEditor.swift */; };
 		0E4E4DB991C47A24C50FD77F /* TextPositionConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74BE7DB5DFFE882E4B55BF17 /* TextPositionConverter.swift */; };
 		0FFF5B06167093C7A3CF13DC /* ExecutionResultPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4766E4C5DA28FCAA82DB5D8C /* ExecutionResultPresenter.swift */; };
+		1309A085F067A28E06B5714F /* SQLiteProjectsRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F5E235274E754263E824A2 /* SQLiteProjectsRepository.swift */; };
 		1557B0102FC595A7FACFEA3B /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089DD620DC65619873282D8D /* ProcessRunner.swift */; };
 		166361F2BCACD7C495FB7FCB /* BinaryTooling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D3BABA81E1746CE0A705E1 /* BinaryTooling.swift */; };
 		1CC13C04A6DF229B0B0209C8 /* PHPSymbolImportSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F885E28A3CED0451E7ED5660 /* PHPSymbolImportSupport.swift */; };
+		1D83EF0962DAF27B168CDA68 /* WorkspaceProjectPersistenceSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE6259CA1DEF4ED39826949B /* WorkspaceProjectPersistenceSanitizer.swift */; };
+		222AEFF7675C7018CA69AE06 /* SQLiteWorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1677C44574670746662053A /* SQLiteWorkspaceStore.swift */; };
+		24AD8992B5321E83AC4D4982 /* SQLiteSchemaManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7B2BD7A3C1F5EA56B919AD9 /* SQLiteSchemaManager.swift */; };
 		297DB11570450B821E3973B0 /* STTextView-Plugin-Neon in Frameworks */ = {isa = PBXBuildFile; productRef = 57055A4399366F807072010C /* STTextView-Plugin-Neon */; };
 		2C4E8378FD180E7145A7AEF5 /* OnboardingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9970863E634F848DBE2C6D5E /* OnboardingSheet.swift */; };
 		346F66CC98F91578D07A8C07 /* PHPExecutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C14C57DCA9C0540DCFC1420 /* PHPExecutionService.swift */; };
+		39FA99EBD5566EC20634E94C /* SQLiteSettingsRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB02F2144C9BBC735990F9BA /* SQLiteSettingsRepository.swift */; };
 		39FABDA2C6C93B87C419991E /* RunHistoryWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D4CC5CAB6A5BF4C78DB4E57 /* RunHistoryWindowView.swift */; };
+		3E7DCA4748733C4E52B3BAEF /* SQLiteRunHistoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6086EB03023644EC49FB50A5 /* SQLiteRunHistoryRepository.swift */; };
 		3F1FE015C72C70F7EE46E072 /* WorkspaceExecutionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA49A00672807B78AB9E1BD7 /* WorkspaceExecutionSupport.swift */; };
 		4110EA59E90173991D7934AE /* UIScaleSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2C0758540C37FCD4EDC18F /* UIScaleSanitizer.swift */; };
 		47947BE7290FA3042F31D5B3 /* ResultPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E99EE6EBA5EDDCB524D690D3 /* ResultPaneView.swift */; };
+		5270B860C1DFAA7A2198D507 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = DAF46068855723FA63DFF73C /* libsqlite3.tbd */; };
 		555237BAFAC6B1E3E9E01749 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBC131919D5D01EE74C688C4 /* AppContainer.swift */; };
 		5590015B057BBAB4B2B2C8AF /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE15DCC1AAE6AA70EAD2578 /* AppDelegate.swift */; };
 		66D524494787D2E6E5E80D19 /* ProjectContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F186B6B729554AEB916F1710 /* ProjectContracts.swift */; };
+		68952EF5FBD3CDF2E4653FC9 /* SQLiteWorkspaceStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82328598ACFAF8951762EB26 /* SQLiteWorkspaceStoreTests.swift */; };
+		6A26CDC4DE6D562DB392BEEB /* SQLiteDraftsRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1D52478935EE7E19BE5246 /* SQLiteDraftsRepository.swift */; };
 		70E590EC7C4919DEBEA63AFC /* CompletionContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A1BA2E73EB7821D4CD15A16 /* CompletionContracts.swift */; };
+		83490C107C96CF175CACC9D1 /* SQLiteOutputCacheRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82DD7A1F0E73106A79A46028 /* SQLiteOutputCacheRepository.swift */; };
 		98012327C79B3EA468725CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CA41881C1CDF7F49F88F2711 /* Assets.xcassets */; };
 		BCC209C765789CB876DEAC2C /* PHPLSPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00152DBDC01E4EC663FBAB7 /* PHPLSPService.swift */; };
+		BF8BC7944DB9057CC3798773 /* SQLiteMetaRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA5D9A23A08E9FA84F682F20 /* SQLiteMetaRepository.swift */; };
 		C5532CACA1E938690EBB8AA1 /* EditorPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65B6D667727B2C8DB722E66B /* EditorPaneView.swift */; };
 		CF2DAD6E384058C995D5407B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8C17DE50D7A125B7092F73 /* SettingsView.swift */; };
 		D2E090BC25C85298684DE6E7 /* ExecutionContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A1C812C6F9FB155B98A817 /* ExecutionContracts.swift */; };
@@ -42,36 +54,59 @@
 		FBFBB20D68250C32D5903E48 /* UserDefaultsWorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9437A2E57D2555C22BCC6897 /* UserDefaultsWorkspaceStore.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		12C93CD06D70DE06B916C130 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D72706B33D804F120BD13EA4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FD82EFD2FEF297E2D35758CB;
+			remoteInfo = TinkerSwift;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		089DD620DC65619873282D8D /* ProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessRunner.swift; sourceTree = "<group>"; };
 		0B4AF2768516F01A838E295B /* EditorCompletionOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCompletionOrchestrator.swift; sourceTree = "<group>"; };
 		197A780140CD674D3D057BB7 /* TinkerSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TinkerSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1B0006A25CE65F698145CFE5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		1E159573E6F36876BDC3F163 /* TinkerSwiftTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TinkerSwiftTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2126F5DDD177527BCAC52E0C /* PersistenceContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceContracts.swift; sourceTree = "<group>"; };
 		3A1BA2E73EB7821D4CD15A16 /* CompletionContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionContracts.swift; sourceTree = "<group>"; };
 		3E2C0758540C37FCD4EDC18F /* UIScaleSanitizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIScaleSanitizer.swift; sourceTree = "<group>"; };
 		3FD787F69751EB1A26F08323 /* ReplWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplWorkspaceView.swift; sourceTree = "<group>"; };
+		4475E7AC72053E689F6EB8DB /* SQLiteSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteSupport.swift; sourceTree = "<group>"; };
 		4766E4C5DA28FCAA82DB5D8C /* ExecutionResultPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionResultPresenter.swift; sourceTree = "<group>"; };
 		4EE15DCC1AAE6AA70EAD2578 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		584BDC99B811332EF83715A1 /* WorkspaceWindowFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceWindowFactory.swift; sourceTree = "<group>"; };
+		6086EB03023644EC49FB50A5 /* SQLiteRunHistoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteRunHistoryRepository.swift; sourceTree = "<group>"; };
 		65B6D667727B2C8DB722E66B /* EditorPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorPaneView.swift; sourceTree = "<group>"; };
 		6C14C57DCA9C0540DCFC1420 /* PHPExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPExecutionService.swift; sourceTree = "<group>"; };
 		74BE7DB5DFFE882E4B55BF17 /* TextPositionConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextPositionConverter.swift; sourceTree = "<group>"; };
 		7D43AAD34C975F29FC933829 /* ProjectSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectSidebarView.swift; sourceTree = "<group>"; };
 		7D4CC5CAB6A5BF4C78DB4E57 /* RunHistoryWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunHistoryWindowView.swift; sourceTree = "<group>"; };
 		80D3BABA81E1746CE0A705E1 /* BinaryTooling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BinaryTooling.swift; sourceTree = "<group>"; };
+		82328598ACFAF8951762EB26 /* SQLiteWorkspaceStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteWorkspaceStoreTests.swift; sourceTree = "<group>"; };
+		82DD7A1F0E73106A79A46028 /* SQLiteOutputCacheRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteOutputCacheRepository.swift; sourceTree = "<group>"; };
 		8CBCB1FAF921EFBA6157963E /* AppKitCodeEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitCodeEditor.swift; sourceTree = "<group>"; };
 		9437A2E57D2555C22BCC6897 /* UserDefaultsWorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsWorkspaceStore.swift; sourceTree = "<group>"; };
 		9970863E634F848DBE2C6D5E /* OnboardingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSheet.swift; sourceTree = "<group>"; };
 		9D906D78C834B088D694CC31 /* WorkspaceDataServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceDataServices.swift; sourceTree = "<group>"; };
 		A00152DBDC01E4EC663FBAB7 /* PHPLSPService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPLSPService.swift; sourceTree = "<group>"; };
 		A7A1C812C6F9FB155B98A817 /* ExecutionContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionContracts.swift; sourceTree = "<group>"; };
+		AB02F2144C9BBC735990F9BA /* SQLiteSettingsRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteSettingsRepository.swift; sourceTree = "<group>"; };
 		AB8C17DE50D7A125B7092F73 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		AC1D52478935EE7E19BE5246 /* SQLiteDraftsRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteDraftsRepository.swift; sourceTree = "<group>"; };
+		B1F5E235274E754263E824A2 /* SQLiteProjectsRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteProjectsRepository.swift; sourceTree = "<group>"; };
 		B32CD6861A5CE49E9A56D45D /* TinkerSwiftApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TinkerSwiftApp.swift; sourceTree = "<group>"; };
 		B7DB5B6353E7B627FE1D26A7 /* TinkerSwiftState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TinkerSwiftState.swift; sourceTree = "<group>"; };
 		BA49A00672807B78AB9E1BD7 /* WorkspaceExecutionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceExecutionSupport.swift; sourceTree = "<group>"; };
+		BE6259CA1DEF4ED39826949B /* WorkspaceProjectPersistenceSanitizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceProjectPersistenceSanitizer.swift; sourceTree = "<group>"; };
 		CA41881C1CDF7F49F88F2711 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CBC131919D5D01EE74C688C4 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
+		D1677C44574670746662053A /* SQLiteWorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteWorkspaceStore.swift; sourceTree = "<group>"; };
+		D7B2BD7A3C1F5EA56B919AD9 /* SQLiteSchemaManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteSchemaManager.swift; sourceTree = "<group>"; };
+		DA5D9A23A08E9FA84F682F20 /* SQLiteMetaRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteMetaRepository.swift; sourceTree = "<group>"; };
+		DAF46068855723FA63DFF73C /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		E99EE6EBA5EDDCB524D690D3 /* ResultPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultPaneView.swift; sourceTree = "<group>"; };
 		F186B6B729554AEB916F1710 /* ProjectContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectContracts.swift; sourceTree = "<group>"; };
 		F885E28A3CED0451E7ED5660 /* PHPSymbolImportSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPSymbolImportSupport.swift; sourceTree = "<group>"; };
@@ -84,6 +119,7 @@
 			files = (
 				D3D4C941638D44660478ABB8 /* STTextView in Frameworks */,
 				297DB11570450B821E3973B0 /* STTextView-Plugin-Neon in Frameworks */,
+				5270B860C1DFAA7A2198D507 /* libsqlite3.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -122,8 +158,17 @@
 			isa = PBXGroup;
 			children = (
 				197A780140CD674D3D057BB7 /* TinkerSwift.app */,
+				1E159573E6F36876BDC3F163 /* TinkerSwiftTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		13E7486467BA48CA03B13E74 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				DAF46068855723FA63DFF73C /* libsqlite3.tbd */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 		1FB41D793C932B3622A55CE4 /* Workspace */ = {
@@ -142,6 +187,8 @@
 			isa = PBXGroup;
 			children = (
 				A07BB4D64935180AAFD86CEB /* TinkerSwift */,
+				8B5F92CAEC69B47365F5FA3F /* TinkerSwiftTests */,
+				13E7486467BA48CA03B13E74 /* Frameworks */,
 				11858D6C0BCDBDDD6AA07C3F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -179,6 +226,30 @@
 				AB8C17DE50D7A125B7092F73 /* SettingsView.swift */,
 			);
 			path = Settings;
+			sourceTree = "<group>";
+		};
+		8B5F92CAEC69B47365F5FA3F /* TinkerSwiftTests */ = {
+			isa = PBXGroup;
+			children = (
+				82328598ACFAF8951762EB26 /* SQLiteWorkspaceStoreTests.swift */,
+			);
+			path = TinkerSwiftTests;
+			sourceTree = "<group>";
+		};
+		9A45EB9BFBF81F1F3721BC91 /* SQLite */ = {
+			isa = PBXGroup;
+			children = (
+				AC1D52478935EE7E19BE5246 /* SQLiteDraftsRepository.swift */,
+				DA5D9A23A08E9FA84F682F20 /* SQLiteMetaRepository.swift */,
+				82DD7A1F0E73106A79A46028 /* SQLiteOutputCacheRepository.swift */,
+				B1F5E235274E754263E824A2 /* SQLiteProjectsRepository.swift */,
+				6086EB03023644EC49FB50A5 /* SQLiteRunHistoryRepository.swift */,
+				D7B2BD7A3C1F5EA56B919AD9 /* SQLiteSchemaManager.swift */,
+				AB02F2144C9BBC735990F9BA /* SQLiteSettingsRepository.swift */,
+				4475E7AC72053E689F6EB8DB /* SQLiteSupport.swift */,
+				D1677C44574670746662053A /* SQLiteWorkspaceStore.swift */,
+			);
+			path = SQLite;
 			sourceTree = "<group>";
 		};
 		A07BB4D64935180AAFD86CEB /* TinkerSwift */ = {
@@ -220,6 +291,8 @@
 			isa = PBXGroup;
 			children = (
 				9437A2E57D2555C22BCC6897 /* UserDefaultsWorkspaceStore.swift */,
+				BE6259CA1DEF4ED39826949B /* WorkspaceProjectPersistenceSanitizer.swift */,
+				9A45EB9BFBF81F1F3721BC91 /* SQLite */,
 			);
 			path = Persistence;
 			sourceTree = "<group>";
@@ -259,6 +332,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		EE77954AFF008872E17F996C /* TinkerSwiftTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9B95368BE79279F0CD3FE3B7 /* Build configuration list for PBXNativeTarget "TinkerSwiftTests" */;
+			buildPhases = (
+				A19E8975B258B44842FFA0BD /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CE801E8875255EF570A3441D /* PBXTargetDependency */,
+			);
+			name = TinkerSwiftTests;
+			packageProductDependencies = (
+			);
+			productName = TinkerSwiftTests;
+			productReference = 1E159573E6F36876BDC3F163 /* TinkerSwiftTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		FD82EFD2FEF297E2D35758CB /* TinkerSwift */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 60578DEBBC3967DE74B2DA8E /* Build configuration list for PBXNativeTarget "TinkerSwift" */;
@@ -289,6 +380,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					EE77954AFF008872E17F996C = {
+						DevelopmentTeam = "";
+					};
 					FD82EFD2FEF297E2D35758CB = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
@@ -314,6 +408,7 @@
 			projectRoot = "";
 			targets = (
 				FD82EFD2FEF297E2D35758CB /* TinkerSwift */,
+				EE77954AFF008872E17F996C /* TinkerSwiftTests */,
 			);
 		};
 /* End PBXProject section */
@@ -355,6 +450,15 @@
 				F69C4AFA24B6317CCEFC2CC5 /* ReplWorkspaceView.swift in Sources */,
 				47947BE7290FA3042F31D5B3 /* ResultPaneView.swift in Sources */,
 				39FABDA2C6C93B87C419991E /* RunHistoryWindowView.swift in Sources */,
+				6A26CDC4DE6D562DB392BEEB /* SQLiteDraftsRepository.swift in Sources */,
+				BF8BC7944DB9057CC3798773 /* SQLiteMetaRepository.swift in Sources */,
+				83490C107C96CF175CACC9D1 /* SQLiteOutputCacheRepository.swift in Sources */,
+				1309A085F067A28E06B5714F /* SQLiteProjectsRepository.swift in Sources */,
+				3E7DCA4748733C4E52B3BAEF /* SQLiteRunHistoryRepository.swift in Sources */,
+				24AD8992B5321E83AC4D4982 /* SQLiteSchemaManager.swift in Sources */,
+				39FA99EBD5566EC20634E94C /* SQLiteSettingsRepository.swift in Sources */,
+				0D01AB11637C1AB5C5409326 /* SQLiteSupport.swift in Sources */,
+				222AEFF7675C7018CA69AE06 /* SQLiteWorkspaceStore.swift in Sources */,
 				CF2DAD6E384058C995D5407B /* SettingsView.swift in Sources */,
 				0E4E4DB991C47A24C50FD77F /* TextPositionConverter.swift in Sources */,
 				0046D9DC5525FCDE7BBF89B1 /* TinkerSwiftApp.swift in Sources */,
@@ -363,13 +467,46 @@
 				FBFBB20D68250C32D5903E48 /* UserDefaultsWorkspaceStore.swift in Sources */,
 				069B88FDC7F79B121A20CA90 /* WorkspaceDataServices.swift in Sources */,
 				3F1FE015C72C70F7EE46E072 /* WorkspaceExecutionSupport.swift in Sources */,
+				1D83EF0962DAF27B168CDA68 /* WorkspaceProjectPersistenceSanitizer.swift in Sources */,
 				08A2E195C8ADC0D61D49E04A /* WorkspaceWindowFactory.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A19E8975B258B44842FFA0BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				68952EF5FBD3CDF2E4653FC9 /* SQLiteWorkspaceStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		CE801E8875255EF570A3441D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FD82EFD2FEF297E2D35758CB /* TinkerSwift */;
+			targetProxy = 12C93CD06D70DE06B916C130 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		39338DE032909543246F5934 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TinkerSwift.app/Contents/MacOS/TinkerSwift";
+			};
+			name = Debug;
+		};
 		473F68D73D7C1B6C2BFFBAA6 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -464,6 +601,22 @@
 			};
 			name = Release;
 		};
+		DBB01D445453332186C2C70B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TinkerSwift.app/Contents/MacOS/TinkerSwift";
+			};
+			name = Release;
+		};
 		EEC072218CB9B2DBB4C78A03 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -539,6 +692,15 @@
 			buildConfigurations = (
 				473F68D73D7C1B6C2BFFBAA6 /* Debug */,
 				BBCE30404EA3C4A33663DCB5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9B95368BE79279F0CD3FE3B7 /* Build configuration list for PBXNativeTarget "TinkerSwiftTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				39338DE032909543246F5934 /* Debug */,
+				DBB01D445453332186C2C70B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
