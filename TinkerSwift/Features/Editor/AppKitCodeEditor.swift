@@ -576,6 +576,29 @@ fileprivate final class CodePaneTextView: STTextView {
             self?.onVisualStateChange?()
         }
     }
+
+    override func paste(_ sender: Any?) {
+        guard isEditable else { return }
+
+        let pasteboard = NSPasteboard.general
+        if let stringContent = pasteboard.string(forType: .string) {
+            let currentSelection = selectedRange()
+            let replacementRange: NSRange
+            if currentSelection.location == NSNotFound {
+                let currentText = text ?? ""
+                let length = (currentText as NSString).length
+                replacementRange = NSRange(location: length, length: 0)
+            } else {
+                replacementRange = currentSelection
+            }
+
+            replaceCharacters(in: replacementRange, with: stringContent)
+            let insertedLength = (stringContent as NSString).length
+            textSelection = NSRange(location: replacementRange.location + insertedLength, length: 0)
+        } else {
+            super.paste(sender)
+        }
+    }
 }
 
 @MainActor
