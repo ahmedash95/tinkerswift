@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>TinkerSwift</title>
+        <link>https://raw.githubusercontent.com/ahmedash95/tinkerswift/refs/heads/main/appcast.xml</link>
+        <description>TinkerSwift updates</description>
+        <item>
+            <pubDate>Thu, 20 Feb 2026 12:00:00 +0000</pubDate>
+            <link>https://raw.githubusercontent.com/ahmedash95/tinkerswift/refs/heads/main/appcast.xml</link>
+            <sparkle:version>0</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>TinkerSwift-0.1.0</title>
+<body>
+<h2>TinkerSwift 0.1.0</h2>
+<ul>
+<li>Initial release.</li>
+</ul>
+</body>
+</html>]]></description>
+            <enclosure url="https://github.com/ahmedash95/tinkerswift/releases/download/0.1.0/TinkerSwift-0.1.0.dmg" length="0" type="application/octet-stream" sparkle:edSignature="mQleQdz5ky823nmER6Sxde76GUtzT5KBMNSVp0jd/nU="/>
+        </item>
+    </channel>
+</rss>

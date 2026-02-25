@@ -48,5 +48,5 @@ targets:
       - path: TinkerSwiftTests
     dependencies:
       - target: TinkerSwift
-        SUFeedURL: https://ahmedash95.github.io/tinkerswift/appcast.xml
-        SUPublicEDKey: PLACEHOLDER_KEY
+        SUFeedURL: https://raw.githubusercontent.com/ahmedash95/tinkerswift/refs/heads/main/appcast.xml
+        SUPublicEDKey: mQleQdz5ky823nmER6Sxde76GUtzT5KBMNSVp0jd/nU=
