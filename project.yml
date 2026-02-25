@@ -28,9 +28,18 @@ targets:
         product: STTextView
       - package: STTextViewPluginNeon
         product: STTextView-Plugin-Neon
+      - sdk: libsqlite3.tbd
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: TinkerSwift/AppIcon.icon
         ENABLE_HARDENED_RUNTIME: YES
         PRODUCT_NAME: TinkerSwift
         CODE_SIGN_STYLE: Automatic
+  TinkerSwiftTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: TinkerSwiftTests
+    dependencies:
+      - target: TinkerSwift
