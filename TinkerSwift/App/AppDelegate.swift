@@ -8,7 +8,8 @@ extension Notification.Name {
 }
 
 @MainActor
-final class TinkerSwiftAppDelegate: NSObject, NSApplicationDelegate {
+final class TinkerSwiftAppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
+    private static let fallbackAppcastURL = "https://raw.githubusercontent.com/ahmedash95/tinkerswift/main/appcast.xml"
     private weak var appModel: AppModel?
     private var externalWindowControllers: [NSWindowController] = []
     private var updaterController: SPUStandardUpdaterController?
@@ -22,11 +23,11 @@ final class TinkerSwiftAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        #if DEBUG
-        updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
-        #else
-        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
-        #endif
+       #if DEBUG
+       updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
+       #else
+       updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
+       #endif
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleNewTabRequest(_:)),
@@ -87,5 +88,14 @@ final class TinkerSwiftAppDelegate: NSObject, NSApplicationDelegate {
             name: NSWindow.willCloseNotification,
             object: controller.window
         )
+    }
+
+    func feedURLString(for updater: SPUUpdater) -> String? {
+        if let feedURL = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String,
+           !feedURL.isEmpty {
+            return feedURL
+        }
+
+        return Self.fallbackAppcastURL
     }
 }

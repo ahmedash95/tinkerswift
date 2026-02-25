@@ -48,6 +48,7 @@
 		D2E090BC25C85298684DE6E7 /* ExecutionContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A1C812C6F9FB155B98A817 /* ExecutionContracts.swift */; };
 		D3D4C941638D44660478ABB8 /* STTextView in Frameworks */ = {isa = PBXBuildFile; productRef = D97CADF26E40B2AAF2540EF7 /* STTextView */; };
 		D7C3A8CB527F5229279CB7EC /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B0006A25CE65F698145CFE5 /* ContentView.swift */; };
+		DE96065400825F1FB59B18DC /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = AE6A5A6BB71880F3E606A118 /* Sparkle */; };
 		E0B60C731549B126D41B2998 /* TinkerSwiftState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7DB5B6353E7B627FE1D26A7 /* TinkerSwiftState.swift */; };
 		EE0A5FA94C50DDBBA0A7D9BF /* EditorCompletionOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B4AF2768516F01A838E295B /* EditorCompletionOrchestrator.swift */; };
 		F69C4AFA24B6317CCEFC2CC5 /* ReplWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FD787F69751EB1A26F08323 /* ReplWorkspaceView.swift */; };
@@ -80,6 +81,7 @@
 		584BDC99B811332EF83715A1 /* WorkspaceWindowFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceWindowFactory.swift; sourceTree = "<group>"; };
 		6086EB03023644EC49FB50A5 /* SQLiteRunHistoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteRunHistoryRepository.swift; sourceTree = "<group>"; };
 		65B6D667727B2C8DB722E66B /* EditorPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorPaneView.swift; sourceTree = "<group>"; };
+		6A7C73B100A4922AC36AD179 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		6C14C57DCA9C0540DCFC1420 /* PHPExecutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHPExecutionService.swift; sourceTree = "<group>"; };
 		74BE7DB5DFFE882E4B55BF17 /* TextPositionConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextPositionConverter.swift; sourceTree = "<group>"; };
 		7D43AAD34C975F29FC933829 /* ProjectSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectSidebarView.swift; sourceTree = "<group>"; };
@@ -120,6 +122,7 @@
 				D3D4C941638D44660478ABB8 /* STTextView in Frameworks */,
 				297DB11570450B821E3973B0 /* STTextView-Plugin-Neon in Frameworks */,
 				5270B860C1DFAA7A2198D507 /* libsqlite3.tbd in Frameworks */,
+				DE96065400825F1FB59B18DC /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -256,6 +259,7 @@
 			isa = PBXGroup;
 			children = (
 				CA41881C1CDF7F49F88F2711 /* Assets.xcassets */,
+				6A7C73B100A4922AC36AD179 /* Info.plist */,
 				FE03955B451179088930D78F /* App */,
 				FFEDC8B46310C8D16535A088 /* Core */,
 				A2E1664217AB7094BF59BD4A /* Features */,
@@ -366,6 +370,7 @@
 			packageProductDependencies = (
 				D97CADF26E40B2AAF2540EF7 /* STTextView */,
 				57055A4399366F807072010C /* STTextView-Plugin-Neon */,
+				AE6A5A6BB71880F3E606A118 /* Sparkle */,
 			);
 			productName = TinkerSwift;
 			productReference = 197A780140CD674D3D057BB7 /* TinkerSwift.app */;
@@ -402,6 +407,7 @@
 			packageReferences = (
 				6FC744F16C91C11C133070B0 /* XCRemoteSwiftPackageReference "STTextView" */,
 				7DE8D9DB5EE46F5BCF734C97 /* XCRemoteSwiftPackageReference "STTextView-Plugin-Neon" */,
+				C8F42851917A804D1FAC9C95 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
@@ -510,10 +516,11 @@
 		473F68D73D7C1B6C2BFFBAA6 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = TinkerSwift/AppIcon.icon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = TinkerSwift/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -527,10 +534,11 @@
 		BBCE30404EA3C4A33663DCB5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = TinkerSwift/AppIcon.icon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = TinkerSwift/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -733,6 +741,14 @@
 				kind = branch;
 			};
 		};
+		C8F42851917A804D1FAC9C95 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.4;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -740,6 +756,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7DE8D9DB5EE46F5BCF734C97 /* XCRemoteSwiftPackageReference "STTextView-Plugin-Neon" */;
 			productName = "STTextView-Plugin-Neon";
+		};
+		AE6A5A6BB71880F3E606A118 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C8F42851917A804D1FAC9C95 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 		D97CADF26E40B2AAF2540EF7 /* STTextView */ = {
 			isa = XCSwiftPackageProductDependency;
