@@ -5,6 +5,33 @@
         <link>https://raw.githubusercontent.com/ahmedash95/tinkerswift/refs/heads/main/appcast.xml</link>
         <description>TinkerSwift updates</description>
         <item>
+            <link>https://raw.githubusercontent.com/ahmedash95/tinkerswift/refs/heads/main/appcast.xml</link>
+            <title>0.2.0</title>
+            <pubDate>Wed, 25 Feb 2026 22:17:51 +0100</pubDate>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://raw.githubusercontent.com/ahmedash95/tinkerswift/main/tinkerswift-0.2.0.dmg" length="7681395" type="application/octet-stream" sparkle:edSignature="KxsZXu/lqKCm9nX4Sj9KRkgQiXmUALViY/ubMWG4ZT1tS8+2ZiJXg/f2lZ/tYFM6sOnuOB4I6vBy9ffR6PG/CQ=="/>
+            <description><![CDATA[<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>TinkerSwift-0.2.0</title>
+<body>
+<h2>TinkerSwift 0.2.0</h2>
+<ul>
+<li>- Fix Sparkle - by @ahmedash95</li>
+<li>- feat: integrate Sparkle for self-updates (#6) - by @saurabhsharma2u</li>
+<li>- Move to Sqlite (#12) - by @ahmedash95</li>
+<li>- Intercept pasteboard during STTextView paste to strip rich text crashes (#15) - by @saurabhsharma2u</li>
+<li>- Fix app crash on launch when initializing AppModel (#14) - by @saurabhsharma2u</li>
+<li>- feat(settings): add appearance context to Editor Preferences (#10) - by @saurabhsharma2u</li>
+<li>- feat: persist execution output per project during session (#9) - by @saurabhsharma2u</li>
+<li>- style: modernize Settings page visual design (#7) - by @saurabhsharma2u</li>
+</ul>
+</body>
+</html>]]></description>
+        </item>
+        <item>
             <pubDate>Thu, 20 Feb 2026 12:00:00 +0000</pubDate>
             <link>https://raw.githubusercontent.com/ahmedash95/tinkerswift/refs/heads/main/appcast.xml</link>
             <sparkle:version>0</sparkle:version>
