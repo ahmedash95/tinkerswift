@@ -130,3 +130,101 @@ struct EditorDraftService {
         return next
     }
 }
+
+@MainActor
+struct SnippetCatalogService {
+    let titleMaxLength: Int
+
+    init(titleMaxLength: Int = 120) {
+        self.titleMaxLength = titleMaxLength
+    }
+
+    func sorted(_ snippets: [WorkspaceSnippetItem]) -> [WorkspaceSnippetItem] {
+        snippets.sorted { lhs, rhs in
+            if lhs.createdAt == rhs.createdAt {
+                return lhs.id > rhs.id
+            }
+            return lhs.createdAt > rhs.createdAt
+        }
+    }
+
+    func add(
+        title: String,
+        content: String,
+        sourceProjectID: String,
+        now: Date = Date(),
+        to snippets: [WorkspaceSnippetItem]
+    ) -> [WorkspaceSnippetItem] {
+        let normalizedTitle = normalizedTitle(title)
+        let normalizedContent = normalizedContent(content)
+        let normalizedSourceProjectID = sourceProjectID.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !normalizedTitle.isEmpty, !normalizedContent.isEmpty, !normalizedSourceProjectID.isEmpty else {
+            return snippets
+        }
+
+        var next = snippets
+        next.append(
+            WorkspaceSnippetItem(
+                id: UUID().uuidString,
+                title: normalizedTitle,
+                content: normalizedContent,
+                sourceProjectID: normalizedSourceProjectID,
+                createdAt: now,
+                updatedAt: now
+            )
+        )
+        return sorted(next)
+    }
+
+    func update(
+        id: String,
+        title: String,
+        content: String,
+        in snippets: [WorkspaceSnippetItem],
+        now: Date = Date()
+    ) -> [WorkspaceSnippetItem] {
+        let normalizedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedTitle = normalizedTitle(title)
+        let normalizedContent = normalizedContent(content)
+        guard !normalizedID.isEmpty, !normalizedTitle.isEmpty, !normalizedContent.isEmpty else {
+            return snippets
+        }
+        guard let index = snippets.firstIndex(where: { $0.id == normalizedID }) else {
+            return snippets
+        }
+
+        var next = snippets
+        let existing = next[index]
+        next[index] = WorkspaceSnippetItem(
+            id: existing.id,
+            title: normalizedTitle,
+            content: normalizedContent,
+            sourceProjectID: existing.sourceProjectID,
+            createdAt: existing.createdAt,
+            updatedAt: now
+        )
+        return sorted(next)
+    }
+
+    func delete(id: String, from snippets: [WorkspaceSnippetItem]) -> [WorkspaceSnippetItem] {
+        let normalizedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedID.isEmpty else { return snippets }
+        return snippets.filter { $0.id != normalizedID }
+    }
+
+    private func normalizedTitle(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        if trimmed.count <= titleMaxLength {
+            return trimmed
+        }
+        return String(trimmed.prefix(titleMaxLength))
+    }
+
+    private func normalizedContent(_ value: String) -> String {
+        let normalized = value.replacingOccurrences(of: "\r\n", with: "\n")
+        let trimmedForValidation = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedForValidation.isEmpty ? "" : normalized
+    }
+}

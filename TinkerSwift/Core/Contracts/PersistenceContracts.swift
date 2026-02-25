@@ -53,6 +53,15 @@ struct AppSettings: Sendable {
     var laravelBinaryPathOverride: String
 }
 
+struct WorkspaceSnippetItem: Codable, Hashable, Identifiable, Sendable {
+    let id: String
+    let title: String
+    let content: String
+    let sourceProjectID: String
+    let createdAt: Date
+    let updatedAt: Date
+}
+
 struct WorkspacePersistenceSnapshot: Sendable {
     var settings: AppSettings
     var selectedProjectID: String
@@ -60,6 +69,7 @@ struct WorkspacePersistenceSnapshot: Sendable {
     var runHistory: [ProjectRunHistoryItem]
     var projectDraftsByProjectID: [String: String]
     var projectOutputCacheByProjectID: [String: ProjectOutputCacheEntry]
+    var snippets: [WorkspaceSnippetItem]
     var startupRecoveryMessage: String?
 }
 
@@ -82,5 +92,6 @@ protocol WorkspacePersistenceStore {
     func save(runHistory: [ProjectRunHistoryItem])
     func save(projectDraftsByProjectID: [String: String])
     func save(projectOutputCacheByProjectID: [String: ProjectOutputCacheEntry])
+    func save(snippets: [WorkspaceSnippetItem])
     func save(selectedProjectID: String)
 }

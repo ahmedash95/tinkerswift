@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import XCTest
 @testable import TinkerSwift
 
@@ -50,6 +51,15 @@ final class SQLiteWorkspaceStoreTests: XCTestCase {
         store.save(runHistory: [runHistoryItem])
         store.save(projectDraftsByProjectID: [project.id: "return User::count();"])
         store.save(projectOutputCacheByProjectID: [project.id: output])
+        let snippet = WorkspaceSnippetItem(
+            id: "snippet-1",
+            title: "Count users",
+            content: "return User::count();",
+            sourceProjectID: project.id,
+            createdAt: Date(timeIntervalSince1970: 1_704_000_111.0),
+            updatedAt: Date(timeIntervalSince1970: 1_704_000_111.0)
+        )
+        store.save(snippets: [snippet])
         store.save(selectedProjectID: project.id)
 
         let loaded = store.load()
@@ -60,6 +70,7 @@ final class SQLiteWorkspaceStoreTests: XCTestCase {
         XCTAssertEqual(loaded.runHistory, [runHistoryItem])
         XCTAssertEqual(loaded.projectDraftsByProjectID[project.id], "return User::count();")
         assertOutput(loaded.projectOutputCacheByProjectID[project.id], equals: output)
+        XCTAssertEqual(loaded.snippets, [snippet])
         XCTAssertNil(loaded.startupRecoveryMessage)
     }
 
@@ -81,6 +92,7 @@ final class SQLiteWorkspaceStoreTests: XCTestCase {
         let reloaded = store.load()
 
         XCTAssertEqual(reloaded.projects, [project])
+        XCTAssertEqual(reloaded.snippets, [])
     }
 
     func testProjectsSyncPrunesRemovedProjects() {
@@ -114,6 +126,78 @@ final class SQLiteWorkspaceStoreTests: XCTestCase {
 
         XCTAssertEqual(legacyFallback.loadCallCount, 0)
         XCTAssertEqual(Set(loaded.projects.map(\.id)), Set([existingProject.id]))
+    }
+
+    func testSnippetsSyncPrunesRemovedItems() {
+        let databaseURL = makeDatabaseURL()
+        let fallbackStore = StubWorkspacePersistenceStore(snapshot: emptySnapshot())
+        let store = SQLiteWorkspaceStore(databaseURL: databaseURL, fallbackStore: fallbackStore)
+        _ = store.load()
+
+        let project = WorkspaceProject.local(path: "/tmp/snippets-prune")
+        let snippetA = WorkspaceSnippetItem(
+            id: "snippet-a",
+            title: "Snippet A",
+            content: "return 'A';",
+            sourceProjectID: project.id,
+            createdAt: Date(timeIntervalSince1970: 100),
+            updatedAt: Date(timeIntervalSince1970: 100)
+        )
+        let snippetB = WorkspaceSnippetItem(
+            id: "snippet-b",
+            title: "Snippet B",
+            content: "return 'B';",
+            sourceProjectID: project.id,
+            createdAt: Date(timeIntervalSince1970: 200),
+            updatedAt: Date(timeIntervalSince1970: 200)
+        )
+
+        store.save(snippets: [snippetA, snippetB])
+        store.save(snippets: [snippetB])
+
+        let loaded = store.load()
+        XCTAssertEqual(loaded.snippets, [snippetB])
+    }
+
+    func testIgnoresFallbackSnippetsDuringInitialImport() {
+        let databaseURL = makeDatabaseURL()
+        var snapshot = sampleSnapshot()
+        snapshot.snippets = [
+            WorkspaceSnippetItem(
+                id: "legacy-snippet",
+                title: "Legacy",
+                content: "return 'legacy';",
+                sourceProjectID: snapshot.projects.first?.id ?? "local:/tmp/project",
+                createdAt: Date(timeIntervalSince1970: 123),
+                updatedAt: Date(timeIntervalSince1970: 123)
+            )
+        ]
+        let fallbackStore = StubWorkspacePersistenceStore(snapshot: snapshot)
+        let store = SQLiteWorkspaceStore(databaseURL: databaseURL, fallbackStore: fallbackStore)
+
+        let loaded = store.load()
+
+        XCTAssertEqual(fallbackStore.loadCallCount, 1)
+        XCTAssertEqual(loaded.projects, fallbackStore.snapshot.projects)
+        XCTAssertEqual(loaded.runHistory, fallbackStore.snapshot.runHistory)
+        XCTAssertEqual(loaded.snippets, [])
+    }
+
+    func testMigratesExistingVersion1DatabaseToVersion2Schema() throws {
+        let databaseURL = makeDatabaseURL()
+        try seedVersion1Database(at: databaseURL)
+
+        let fallbackStore = StubWorkspacePersistenceStore(snapshot: emptySnapshot())
+        let store = SQLiteWorkspaceStore(databaseURL: databaseURL, fallbackStore: fallbackStore)
+        _ = store.load()
+
+        let database = try SQLiteDatabase(databaseURL: databaseURL)
+        defer { database.close() }
+        XCTAssertTrue(try database.tableExists("workspace_snippets"))
+
+        let statement = try database.prepare("SELECT COALESCE(MAX(version), 0) FROM workspace_schema_migrations;")
+        XCTAssertEqual(try statement.step(), SQLITE_ROW)
+        XCTAssertEqual(statement.columnInt(at: 0), 2)
     }
 
     private func makeDatabaseURL() -> URL {
@@ -150,6 +234,7 @@ final class SQLiteWorkspaceStoreTests: XCTestCase {
             runHistory: [runHistoryItem],
             projectDraftsByProjectID: [project.id: "return now();"],
             projectOutputCacheByProjectID: [project.id: output],
+            snippets: [],
             startupRecoveryMessage: nil
         )
     }
@@ -177,6 +262,7 @@ final class SQLiteWorkspaceStoreTests: XCTestCase {
             runHistory: [],
             projectDraftsByProjectID: [:],
             projectOutputCacheByProjectID: [:],
+            snippets: [],
             startupRecoveryMessage: nil
         )
     }
@@ -207,6 +293,7 @@ final class SQLiteWorkspaceStoreTests: XCTestCase {
         XCTAssertEqual(actual.runHistory, expected.runHistory)
         XCTAssertEqual(actual.projectDraftsByProjectID, expected.projectDraftsByProjectID)
         XCTAssertEqual(actual.projectOutputCacheByProjectID.keys.sorted(), expected.projectOutputCacheByProjectID.keys.sorted())
+        XCTAssertEqual(actual.snippets, expected.snippets)
 
         for (projectID, expectedOutput) in expected.projectOutputCacheByProjectID {
             assertOutput(actual.projectOutputCacheByProjectID[projectID], equals: expectedOutput)
@@ -252,6 +339,83 @@ final class SQLiteWorkspaceStoreTests: XCTestCase {
         XCTAssertEqual(actual.wasStopped, expected.wasStopped)
         XCTAssertEqual(actual.resultMessage, expected.resultMessage)
     }
+
+    private func seedVersion1Database(at databaseURL: URL) throws {
+        let database = try SQLiteDatabase(databaseURL: databaseURL)
+        defer { database.close() }
+
+        try database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS workspace_schema_migrations (
+                version INTEGER PRIMARY KEY NOT NULL,
+                applied_at TEXT NOT NULL
+            );
+            """
+        )
+        try database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS workspace_settings (
+                key TEXT PRIMARY KEY NOT NULL,
+                value TEXT NOT NULL
+            );
+            """
+        )
+        try database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS workspace_meta (
+                key TEXT PRIMARY KEY NOT NULL,
+                value TEXT NOT NULL
+            );
+            """
+        )
+        try database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS workspace_projects (
+                id TEXT PRIMARY KEY NOT NULL,
+                payload_json TEXT NOT NULL
+            );
+            """
+        )
+        try database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS workspace_run_history (
+                id TEXT PRIMARY KEY NOT NULL,
+                project_id TEXT NOT NULL,
+                code TEXT NOT NULL,
+                executed_at TEXT NOT NULL
+            );
+            """
+        )
+        try database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS workspace_project_drafts (
+                project_id TEXT PRIMARY KEY NOT NULL,
+                code TEXT NOT NULL
+            );
+            """
+        )
+        try database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS workspace_project_output_cache (
+                project_id TEXT PRIMARY KEY NOT NULL,
+                command TEXT NOT NULL,
+                stdout TEXT NOT NULL,
+                stderr TEXT NOT NULL,
+                exit_code INTEGER NOT NULL,
+                duration_ms REAL,
+                peak_memory_bytes INTEGER,
+                was_stopped INTEGER NOT NULL,
+                result_message TEXT NOT NULL
+            );
+            """
+        )
+        try database.execute(
+            """
+            INSERT OR REPLACE INTO workspace_schema_migrations (version, applied_at)
+            VALUES (1, '2025-01-01T00:00:00Z');
+            """
+        )
+    }
 }
 
 @MainActor
@@ -277,6 +441,8 @@ private final class StubWorkspacePersistenceStore: WorkspacePersistenceStore {
     func save(projectDraftsByProjectID: [String: String]) {}
 
     func save(projectOutputCacheByProjectID: [String: ProjectOutputCacheEntry]) {}
+
+    func save(snippets: [WorkspaceSnippetItem]) {}
 
     func save(selectedProjectID: String) {}
 }

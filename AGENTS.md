@@ -40,13 +40,20 @@ This file is the working contract for agents in this repository.
 Run when changing Swift source:
 
 ```bash
-xcodegen generate
-xcodebuild -project TinkerSwift.xcodeproj -scheme TinkerSwift -configuration Debug -derivedDataPath .build-xcode build
+make build
+make test
 ```
+
+## Build and Run Commands
+
+- Always use the `Makefile` targets for local workflows.
+- Use `make build` instead of direct `xcodebuild` commands.
+- Use `make run` to launch the app.
+- Use `make test` to run tests.
+- After code changes, run `make build` and then `make run` automatically (do not wait for the user to ask).
 
 ## Git Safety
 
 - Do not reset or revert unrelated user changes.
 - Keep diffs focused and small.
 - Prefer root-cause fixes over tactical patches.
-

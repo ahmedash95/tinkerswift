@@ -39,6 +39,7 @@ final class AppModel {
     private let projectCatalogService: ProjectCatalogService
     private let runHistoryService: RunHistoryService
     private let draftService: EditorDraftService
+    private let snippetCatalogService: SnippetCatalogService
     private var persistedProjectID = ""
     var startupRecoveryMessage: String?
 
@@ -124,16 +125,22 @@ final class AppModel {
         didSet { persistenceStore.save(projectOutputCacheByProjectID: projectOutputCacheByProjectID) }
     }
 
+    var snippets: [WorkspaceSnippetItem] {
+        didSet { persistenceStore.save(snippets: snippets) }
+    }
+
     init(
         persistenceStore: any WorkspacePersistenceStore = SQLiteWorkspaceStore(),
         projectCatalogService: ProjectCatalogService = ProjectCatalogService(),
         runHistoryService: RunHistoryService = RunHistoryService(),
-        draftService: EditorDraftService = EditorDraftService()
+        draftService: EditorDraftService = EditorDraftService(),
+        snippetCatalogService: SnippetCatalogService = SnippetCatalogService()
     ) {
         self.persistenceStore = persistenceStore
         self.projectCatalogService = projectCatalogService
         self.runHistoryService = runHistoryService
         self.draftService = draftService
+        self.snippetCatalogService = snippetCatalogService
 
         let snapshot = persistenceStore.load()
         let selectedProjectID = snapshot.selectedProjectID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -157,6 +164,7 @@ final class AppModel {
         runHistory = snapshot.runHistory
         projectDraftsByProjectID = snapshot.projectDraftsByProjectID
         projectOutputCacheByProjectID = snapshot.projectOutputCacheByProjectID
+        snippets = snippetCatalogService.sorted(snapshot.snippets)
         startupRecoveryMessage = snapshot.startupRecoveryMessage
     }
 
@@ -210,6 +218,32 @@ final class AppModel {
         var next = projectOutputCacheByProjectID
         next[normalizedProjectID] = output
         projectOutputCacheByProjectID = next
+    }
+
+    func addSnippet(title: String, content: String, sourceProjectID: String) {
+        snippets = snippetCatalogService.add(
+            title: title,
+            content: content,
+            sourceProjectID: sourceProjectID,
+            to: snippets
+        )
+    }
+
+    func updateSnippet(id: String, title: String, content: String) {
+        snippets = snippetCatalogService.update(
+            id: id,
+            title: title,
+            content: content,
+            in: snippets
+        )
+    }
+
+    func deleteSnippet(id: String) {
+        snippets = snippetCatalogService.delete(id: id, from: snippets)
+    }
+
+    func allSnippets() -> [WorkspaceSnippetItem] {
+        snippetCatalogService.sorted(snippets)
     }
 
     func dismissStartupRecoveryMessage() {
@@ -288,6 +322,9 @@ return $users->toJson();
     private let defaultProject = WorkspaceProject.local(path: WorkspaceState.defaultProjectPath)
     private var historyWindowController: NSWindowController?
     private var historyWindowCloseObserver: NSObjectProtocol?
+    private var snippetManagerWindowController: NSWindowController?
+    private var snippetManagerWindowCloseObserver: NSObjectProtocol?
+    private weak var snippetEditorTargetWindow: NSWindow?
 
     var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
     var isPickingProjectFolder = false
@@ -296,6 +333,7 @@ return $users->toJson();
     var isShowingProjectEditSheet = false
     var isShowingRenameProjectSheet = false
     var isShowingSymbolSearchSheet = false
+    var isShowingSnippetCaptureSheet = false
     var symbolSearchMode: SymbolSearchMode = .workspace
     var editingProjectID = ""
     var renamingProjectID = ""
@@ -306,6 +344,14 @@ return $users->toJson();
     var defaultProjectInstallCommand = LaravelProjectInstaller.defaultCommand
     var defaultProjectInstallOutput = ""
     var defaultProjectInstallErrorMessage = ""
+    var snippetDraftTitle = ""
+    var snippetDraftContent = ""
+    var snippetManagerSearchText = ""
+    var selectedSnippetID: String?
+    var editingSnippetID: String?
+    var editingSnippetTitle = ""
+    var editingSnippetContent = ""
+    var snippetDeleteCandidate: WorkspaceSnippetItem?
     private var pendingRestartAfterStop = false
     private var isRestoringProjectDraft = false
     private var codeRevision: UInt64 = 0
@@ -484,6 +530,44 @@ return $users->toJson();
         return selectedProjectRunHistory.first(where: { $0.id == selectedRunHistoryItemID })
     }
 
+    var allSnippets: [WorkspaceSnippetItem] {
+        appModel.allSnippets()
+    }
+
+    var filteredSnippets: [WorkspaceSnippetItem] {
+        let query = snippetManagerSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return allSnippets }
+        return allSnippets.filter { snippet in
+            snippet.title.localizedCaseInsensitiveContains(query) ||
+                snippet.content.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    var selectedSnippet: WorkspaceSnippetItem? {
+        guard let selectedSnippetID else { return nil }
+        return allSnippets.first(where: { $0.id == selectedSnippetID })
+    }
+
+    var snippetDraftSourceProjectID: String {
+        selectedProjectID.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var snippetDraftSourceProjectName: String {
+        projectName(for: snippetDraftSourceProjectID)
+    }
+
+    var canSaveSnippetDraft: Bool {
+        !snippetDraftTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !snippetDraftContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !snippetDraftSourceProjectID.isEmpty
+    }
+
+    var canSaveSnippetEdit: Bool {
+        !editingSnippetTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !editingSnippetContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            editingSnippetID != nil
+    }
+
     var resultPresentation: ExecutionPresentation {
         ExecutionResultPresenter.present(
             execution: latestExecution,
@@ -617,6 +701,18 @@ return $users->toJson();
         guard canShowSymbolSearch else { return nil }
         return { [weak self] in
             self?.showDocumentSymbolSearch()
+        }
+    }
+
+    var showSnippetCaptureFromShortcut: (() -> Void)? {
+        { [weak self] in
+            self?.beginCaptureSnippetFromEditor()
+        }
+    }
+
+    var showSnippetManagerFromShortcut: (() -> Void)? {
+        { [weak self] in
+            self?.showSnippetManagerWindow()
         }
     }
 
@@ -872,6 +968,131 @@ return $users->toJson();
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    func beginCaptureSnippetFromEditor() {
+        let sourceProjectID = snippetDraftSourceProjectID
+        guard !sourceProjectID.isEmpty else { return }
+        snippetEditorTargetWindow = NSApp.keyWindow
+        snippetDraftTitle = suggestedSnippetTitle(from: code)
+        snippetDraftContent = code
+        isShowingSnippetCaptureSheet = true
+    }
+
+    func saveSnippetFromDraft() {
+        guard canSaveSnippetDraft else { return }
+        appModel.addSnippet(
+            title: snippetDraftTitle,
+            content: snippetDraftContent,
+            sourceProjectID: snippetDraftSourceProjectID
+        )
+        snippetDraftTitle = ""
+        snippetDraftContent = ""
+        isShowingSnippetCaptureSheet = false
+        selectSnippetIfNeeded()
+    }
+
+    func cancelSnippetDraft() {
+        snippetDraftTitle = ""
+        snippetDraftContent = ""
+        isShowingSnippetCaptureSheet = false
+    }
+
+    func showSnippetManagerWindow() {
+        selectSnippetIfNeeded()
+        if snippetEditorTargetWindow == nil {
+            snippetEditorTargetWindow = NSApp.keyWindow
+        }
+
+        if let existingWindow = snippetManagerWindowController?.window {
+            existingWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let rootView = SnippetManagerWindowView()
+            .environment(self)
+        let hostingController = NSHostingController(rootView: rootView)
+
+        let window = NSWindow(contentViewController: hostingController)
+        window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+        window.title = "Snippets"
+        window.setContentSize(NSSize(width: 940, height: 600))
+        window.minSize = NSSize(width: 820, height: 480)
+        window.isReleasedWhenClosed = false
+
+        let controller = NSWindowController(window: window)
+        snippetManagerWindowController = controller
+
+        snippetManagerWindowCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.snippetManagerWindowController = nil
+                if let observer = self.snippetManagerWindowCloseObserver {
+                    NotificationCenter.default.removeObserver(observer)
+                    self.snippetManagerWindowCloseObserver = nil
+                }
+            }
+        }
+
+        controller.showWindow(nil)
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func beginEditingSelectedSnippet() {
+        guard let selectedSnippet else { return }
+        editingSnippetID = selectedSnippet.id
+        editingSnippetTitle = selectedSnippet.title
+        editingSnippetContent = selectedSnippet.content
+    }
+
+    func cancelSnippetEditing() {
+        editingSnippetID = nil
+        editingSnippetTitle = ""
+        editingSnippetContent = ""
+    }
+
+    func saveSnippetEditing() {
+        guard let editingSnippetID else { return }
+        guard canSaveSnippetEdit else { return }
+        appModel.updateSnippet(
+            id: editingSnippetID,
+            title: editingSnippetTitle,
+            content: editingSnippetContent
+        )
+        cancelSnippetEditing()
+    }
+
+    func requestDeleteSelectedSnippet() {
+        guard let selectedSnippet else { return }
+        snippetDeleteCandidate = selectedSnippet
+    }
+
+    func deleteSnippetCandidate() {
+        guard let snippetDeleteCandidate else { return }
+        appModel.deleteSnippet(id: snippetDeleteCandidate.id)
+        if selectedSnippetID == snippetDeleteCandidate.id {
+            selectedSnippetID = nil
+        }
+        self.snippetDeleteCandidate = nil
+        selectSnippetIfNeeded()
+    }
+
+    func insertSelectedSnippetAtCursor() {
+        guard let selectedSnippet else { return }
+        insertSnippetAtCursor(selectedSnippet)
+        closeSnippetManagerWindow()
+    }
+
+    func replaceEditorWithSelectedSnippet() {
+        guard let selectedSnippet else { return }
+        replaceEditorContent(with: selectedSnippet)
+        closeSnippetManagerWindow()
+    }
+
     func showWorkspaceSymbolSearch() {
         guard canShowSymbolSearch else { return }
         symbolSearchMode = .workspace
@@ -914,6 +1135,10 @@ return $users->toJson();
             object: targetWindow,
             userInfo: ["text": trimmed]
         )
+    }
+
+    func sourceProjectDisplayName(for snippet: WorkspaceSnippetItem) -> String {
+        projectName(for: snippet.sourceProjectID)
     }
 
     func copyTextToPasteboard(_ text: String) {
@@ -1123,6 +1348,62 @@ return $users->toJson();
             NotificationCenter.default.removeObserver(historyWindowCloseObserver)
             self.historyWindowCloseObserver = nil
         }
+    }
+
+    private func closeSnippetManagerWindow() {
+        snippetManagerWindowController?.close()
+        snippetManagerWindowController = nil
+        if let snippetManagerWindowCloseObserver {
+            NotificationCenter.default.removeObserver(snippetManagerWindowCloseObserver)
+            self.snippetManagerWindowCloseObserver = nil
+        }
+    }
+
+    private func selectSnippetIfNeeded() {
+        if let selectedSnippetID,
+           allSnippets.contains(where: { $0.id == selectedSnippetID }) {
+            return
+        }
+        selectedSnippetID = allSnippets.first?.id
+    }
+
+    private func insertSnippetAtCursor(_ snippet: WorkspaceSnippetItem) {
+        let trimmed = snippet.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let targetWindow = snippetEditorTargetWindow ?? NSApp.keyWindow?.sheetParent ?? NSApp.keyWindow
+        guard let targetWindow else { return }
+
+        NotificationCenter.default.post(
+            name: .tinkerSwiftInsertTextAtCursor,
+            object: targetWindow,
+            userInfo: ["text": trimmed]
+        )
+    }
+
+    private func replaceEditorContent(with snippet: WorkspaceSnippetItem) {
+        code = snippet.content
+    }
+
+    private func projectName(for projectID: String) -> String {
+        if projectID == defaultProject.id {
+            return defaultProject.name
+        }
+        if let project = projects.first(where: { $0.id == projectID }) {
+            return project.name
+        }
+        return projectID
+    }
+
+    private func suggestedSnippetTitle(from content: String) -> String {
+        let firstLine = content
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? "Untitled Snippet"
+        if firstLine.count <= 120 {
+            return firstLine
+        }
+        return String(firstLine.prefix(120))
     }
 
     private func performDefaultProjectInstallation(command: String) async {
