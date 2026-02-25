@@ -24,3 +24,4 @@ DerivedData/
 
 # SwiftPM local state
 .swiftpm/
+TinkerSwift.xcodeproj

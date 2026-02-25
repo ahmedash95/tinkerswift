@@ -16,6 +16,9 @@ packages:
   STTextViewPluginNeon:
     url: https://github.com/krzyzanowskim/STTextView-Plugin-Neon
     branch: main
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.6.4
 targets:
   TinkerSwift:
     type: application
@@ -29,9 +32,11 @@ targets:
       - package: STTextViewPluginNeon
         product: STTextView-Plugin-Neon
       - sdk: libsqlite3.tbd
+      - package: Sparkle
+        product: Sparkle
     settings:
       base:
-        ASSETCATALOG_COMPILER_APPICON_NAME: TinkerSwift/AppIcon.icon
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_HARDENED_RUNTIME: YES
         PRODUCT_NAME: TinkerSwift
         CODE_SIGN_STYLE: Automatic
@@ -43,3 +48,5 @@ targets:
       - path: TinkerSwiftTests
     dependencies:
       - target: TinkerSwift
+        SUFeedURL: https://raw.githubusercontent.com/ahmedash95/tinkerswift/refs/heads/main/appcast.xml
+        SUPublicEDKey: mQleQdz5ky823nmER6Sxde76GUtzT5KBMNSVp0jd/nU=
