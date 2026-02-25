@@ -85,6 +85,17 @@ struct ContentView: View {
             }
 
             ToolbarItemGroup(placement: .automatic) {
+                Button(action: workspaceState.showRunHistoryWindow) {
+                    Image(systemName: "clock.arrow.circlepath")
+                }
+                .help("Run History")
+                .disabled(!workspaceState.canShowRunHistory)
+
+                Button(action: workspaceState.showSnippetManagerWindow) {
+                    Image(systemName: "text.badge.plus")
+                }
+                .help("Snippets")
+
                 Button {
                     workspaceState.resultViewMode = .pretty
                 } label: {
@@ -127,12 +138,6 @@ struct ContentView: View {
                 .help("Copy Visible Output")
                 .disabled(!workspaceState.canCopyResultOutput)
 
-                Button(action: workspaceState.showRunHistoryWindow) {
-                    Image(systemName: "clock.arrow.circlepath")
-                }
-                .help("Run History")
-                .disabled(!workspaceState.canShowRunHistory)
-
                 Button(action: workspaceState.revealSelectedProjectInFinder) {
                     Image(systemName: "folder.badge.gearshape")
                 }
@@ -174,10 +179,16 @@ struct ContentView: View {
             SymbolSearchSheet()
                 .environment(workspaceState)
         }
+        .sheet(isPresented: $workspaceState.isShowingSnippetCaptureSheet) {
+            SnippetCaptureSheet()
+                .environment(workspaceState)
+        }
         .focusedSceneValue(\.runCodeAction, workspaceState.runOrRestartFromShortcut)
         .focusedSceneValue(\.isRunningScript, workspaceState.isRunning)
         .focusedSceneValue(\.workspaceSymbolSearchAction, workspaceState.showWorkspaceSymbolSearchFromShortcut)
         .focusedSceneValue(\.documentSymbolSearchAction, workspaceState.showDocumentSymbolSearchFromShortcut)
+        .focusedSceneValue(\.saveSnippetAction, workspaceState.showSnippetCaptureFromShortcut)
+        .focusedSceneValue(\.showSnippetManagerAction, workspaceState.showSnippetManagerFromShortcut)
     }
 
     @ViewBuilder

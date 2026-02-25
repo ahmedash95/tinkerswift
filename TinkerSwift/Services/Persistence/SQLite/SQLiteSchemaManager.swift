@@ -10,6 +10,7 @@ final class SQLiteSchemaManager {
         static let runHistory = "workspace_run_history"
         static let drafts = "workspace_project_drafts"
         static let outputCache = "workspace_project_output_cache"
+        static let snippets = "workspace_snippets"
 
         static let legacySettings = "settings"
         static let legacyProjects = "projects"
@@ -19,7 +20,7 @@ final class SQLiteSchemaManager {
     }
 
     private let database: SQLiteDatabase
-    private let currentVersion = 1
+    private let currentVersion = 2
 
     init(database: SQLiteDatabase) {
         self.database = database
@@ -228,6 +229,33 @@ final class SQLiteSchemaManager {
                 was_stopped INTEGER NOT NULL,
                 result_message TEXT NOT NULL
             );
+            """
+        )
+
+        try database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS \(Table.snippets) (
+                id TEXT PRIMARY KEY NOT NULL,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                source_project_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+
+        try database.execute(
+            """
+            CREATE INDEX IF NOT EXISTS workspace_snippets_created_idx
+            ON \(Table.snippets) (created_at DESC);
+            """
+        )
+
+        try database.execute(
+            """
+            CREATE INDEX IF NOT EXISTS workspace_snippets_project_created_idx
+            ON \(Table.snippets) (source_project_id, created_at DESC);
             """
         )
     }

@@ -94,6 +94,7 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
                 runHistory: [],
                 projectDraftsByProjectID: [:],
                 projectOutputCacheByProjectID: [:],
+                snippets: [],
                 startupRecoveryMessage: Self.startupRecoveryMessage
             )
         }
@@ -155,6 +156,7 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
             runHistory: runHistory,
             projectDraftsByProjectID: projectDraftsByProjectID,
             projectOutputCacheByProjectID: projectOutputCacheByProjectID,
+            snippets: [],
             startupRecoveryMessage: nil
         )
     }
@@ -217,6 +219,8 @@ final class UserDefaultsWorkspaceStore: WorkspacePersistenceStore {
         }
         defaults.set(json, forKey: DefaultsKey.projectOutputCacheByProjectIDJSON)
     }
+
+    func save(snippets: [WorkspaceSnippetItem]) {}
 
     func save(selectedProjectID: String) {
         defaults.set(selectedProjectID, forKey: DefaultsKey.selectedProjectID)

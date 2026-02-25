@@ -17,6 +17,14 @@ private struct DocumentSymbolSearchActionKey: FocusedValueKey {
     typealias Value = () -> Void
 }
 
+private struct SaveSnippetActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+private struct ShowSnippetManagerActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
 extension FocusedValues {
     var runCodeAction: (() -> Void)? {
         get { self[RunCodeActionKey.self] }
@@ -37,6 +45,16 @@ extension FocusedValues {
         get { self[DocumentSymbolSearchActionKey.self] }
         set { self[DocumentSymbolSearchActionKey.self] = newValue }
     }
+
+    var saveSnippetAction: (() -> Void)? {
+        get { self[SaveSnippetActionKey.self] }
+        set { self[SaveSnippetActionKey.self] = newValue }
+    }
+
+    var showSnippetManagerAction: (() -> Void)? {
+        get { self[ShowSnippetManagerActionKey.self] }
+        set { self[ShowSnippetManagerActionKey.self] = newValue }
+    }
 }
 
 private struct TinkerSwiftCommands: Commands {
@@ -46,6 +64,8 @@ private struct TinkerSwiftCommands: Commands {
     @FocusedValue(\.isRunningScript) private var isRunningScript
     @FocusedValue(\.workspaceSymbolSearchAction) private var workspaceSymbolSearchAction
     @FocusedValue(\.documentSymbolSearchAction) private var documentSymbolSearchAction
+    @FocusedValue(\.saveSnippetAction) private var saveSnippetAction
+    @FocusedValue(\.showSnippetManagerAction) private var showSnippetManagerAction
 
     var body: some Commands {
         CommandMenu("Run") {
@@ -107,6 +127,20 @@ private struct TinkerSwiftCommands: Commands {
             }
             .keyboardShortcut("o", modifiers: [.command, .option])
             .disabled(documentSymbolSearchAction == nil)
+
+            Divider()
+
+            Button("Save Snippet from Editor") {
+                saveSnippetAction?()
+            }
+            .keyboardShortcut("s", modifiers: [.command, .option])
+            .disabled(saveSnippetAction == nil)
+
+            Button("Open Snippets") {
+                showSnippetManagerAction?()
+            }
+            .keyboardShortcut("s", modifiers: [.command, .option, .shift])
+            .disabled(showSnippetManagerAction == nil)
         }
     }
 }

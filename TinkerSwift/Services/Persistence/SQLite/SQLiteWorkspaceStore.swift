@@ -23,6 +23,7 @@ final class SQLiteWorkspaceStore: WorkspacePersistenceStore {
     private var runHistoryRepository: SQLiteRunHistoryRepository?
     private var draftsRepository: SQLiteDraftsRepository?
     private var outputCacheRepository: SQLiteOutputCacheRepository?
+    private var snippetsRepository: SQLiteSnippetsRepository?
 
     private var pendingStartupRecoveryMessage: String?
 
@@ -52,7 +53,8 @@ final class SQLiteWorkspaceStore: WorkspacePersistenceStore {
                   let projectsRepository,
                   let runHistoryRepository,
                   let draftsRepository,
-                  let outputCacheRepository
+                  let outputCacheRepository,
+                  let snippetsRepository
             else {
                 throw SQLiteStoreError.invalidData("SQLite repositories are not initialized.")
             }
@@ -62,6 +64,7 @@ final class SQLiteWorkspaceStore: WorkspacePersistenceStore {
             let runHistory = try runHistoryRepository.load()
             let drafts = try draftsRepository.load()
             let outputCache = try outputCacheRepository.load()
+            let snippets = try snippetsRepository.load()
 
             var selectedProjectID = try metaRepository.value(for: MetaKey.selectedProjectID) ?? ""
             if selectedProjectID.isEmpty {
@@ -75,6 +78,7 @@ final class SQLiteWorkspaceStore: WorkspacePersistenceStore {
                 runHistory: runHistory,
                 projectDraftsByProjectID: drafts,
                 projectOutputCacheByProjectID: outputCache,
+                snippets: snippets,
                 startupRecoveryMessage: consumePendingStartupRecoveryMessage()
             )
         } catch {
@@ -86,6 +90,7 @@ final class SQLiteWorkspaceStore: WorkspacePersistenceStore {
                 runHistory: [],
                 projectDraftsByProjectID: [:],
                 projectOutputCacheByProjectID: [:],
+                snippets: [],
                 startupRecoveryMessage: consumePendingStartupRecoveryMessage()
             )
         }
@@ -133,6 +138,15 @@ final class SQLiteWorkspaceStore: WorkspacePersistenceStore {
                 throw SQLiteStoreError.invalidData("Output cache repository is not initialized.")
             }
             try outputCacheRepository.sync(projectOutputCacheByProjectID)
+        }
+    }
+
+    func save(snippets: [WorkspaceSnippetItem]) {
+        performWrite {
+            guard let snippetsRepository else {
+                throw SQLiteStoreError.invalidData("Snippets repository is not initialized.")
+            }
+            try snippetsRepository.sync(snippets)
         }
     }
 
@@ -189,6 +203,7 @@ final class SQLiteWorkspaceStore: WorkspacePersistenceStore {
             runHistoryRepository = SQLiteRunHistoryRepository(database: db)
             draftsRepository = SQLiteDraftsRepository(database: db)
             outputCacheRepository = SQLiteOutputCacheRepository(database: db)
+            snippetsRepository = SQLiteSnippetsRepository(database: db)
         } catch {
             db.close()
             throw error
@@ -208,7 +223,8 @@ final class SQLiteWorkspaceStore: WorkspacePersistenceStore {
               let projectsRepository,
               let runHistoryRepository,
               let draftsRepository,
-              let outputCacheRepository
+              let outputCacheRepository,
+              let snippetsRepository
         else {
             throw SQLiteStoreError.invalidData("SQLite repositories are not initialized.")
         }
@@ -221,11 +237,13 @@ final class SQLiteWorkspaceStore: WorkspacePersistenceStore {
         let hasExistingRunHistory = try !runHistoryRepository.load().isEmpty
         let hasExistingDrafts = try !draftsRepository.load().isEmpty
         let hasExistingOutputCache = try !outputCacheRepository.load().isEmpty
+        let hasExistingSnippets = try !snippetsRepository.load().isEmpty
         let hasExistingData =
             hasExistingProjects ||
             hasExistingRunHistory ||
             hasExistingDrafts ||
-            hasExistingOutputCache
+            hasExistingOutputCache ||
+            hasExistingSnippets
 
         if hasExistingData {
             try metaRepository.setValue(Self.migrationDoneValue, for: MetaKey.didMigrateFromUserDefaults)
@@ -240,6 +258,7 @@ final class SQLiteWorkspaceStore: WorkspacePersistenceStore {
             try runHistoryRepository.sync(snapshot.runHistory)
             try draftsRepository.sync(snapshot.projectDraftsByProjectID)
             try outputCacheRepository.sync(snapshot.projectOutputCacheByProjectID)
+            // Snippets are SQLite-only and are intentionally not imported from UserDefaults fallback.
             try metaRepository.setValue(snapshot.selectedProjectID, for: MetaKey.selectedProjectID)
             try metaRepository.setValue(Self.migrationDoneValue, for: MetaKey.didMigrateFromUserDefaults)
         }
@@ -277,6 +296,7 @@ final class SQLiteWorkspaceStore: WorkspacePersistenceStore {
         runHistoryRepository = nil
         draftsRepository = nil
         outputCacheRepository = nil
+        snippetsRepository = nil
     }
 
     private func backupCorruptedDatabaseIfNeeded() {
