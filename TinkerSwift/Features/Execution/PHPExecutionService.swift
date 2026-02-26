@@ -11,6 +11,8 @@ struct PHPExecutionResult {
     let wasStopped: Bool
 }
 
+extension PHPExecutionResult: Equatable {}
+
 actor DockerEnvironmentService {
     static let shared = DockerEnvironmentService()
 

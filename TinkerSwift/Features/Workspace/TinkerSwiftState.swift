@@ -568,13 +568,30 @@ return $users->toJson();
             editingSnippetID != nil
     }
 
+    @ObservationIgnored private var _cachedResultPresentation: ExecutionPresentation?
+    @ObservationIgnored private var _lastResultPresentationInputs: (PHPExecutionResult?, String, Bool, CGFloat)?
+
     var resultPresentation: ExecutionPresentation {
-        ExecutionResultPresenter.present(
+        let currentInputs = (latestExecution, resultMessage, isRunning, scale)
+        if let last = _lastResultPresentationInputs,
+           last.0 == currentInputs.0,
+           last.1 == currentInputs.1,
+           last.2 == currentInputs.2,
+           last.3 == currentInputs.3,
+           let cached = _cachedResultPresentation
+        {
+            return cached
+        }
+
+        let result = ExecutionResultPresenter.present(
             execution: latestExecution,
             statusMessage: resultMessage,
             isRunning: isRunning,
             fontSize: 14 * scale
         )
+        _cachedResultPresentation = result
+        _lastResultPresentationInputs = currentInputs
+        return result
     }
 
     var resultStatusIconName: String {
