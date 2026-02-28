@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-02-28
+
+- Add snippets (#16) - by @ahmedash95
+
 ## [0.2.0] - 2026-02-25
 
 - Fix Sparkle - by @ahmedash95

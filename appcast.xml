@@ -6,6 +6,26 @@
         <description>TinkerSwift updates</description>
         <item>
             <link>https://raw.githubusercontent.com/ahmedash95/tinkerswift/refs/heads/main/appcast.xml</link>
+            <title>0.3.0</title>
+            <pubDate>Sat, 28 Feb 2026 12:00:00 +0000</pubDate>
+            <sparkle:version>3</sparkle:version>
+            <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/ahmedash95/tinkerswift/releases/download/0.3.0/tinkerswift-0.3.0.dmg" length="7800533" type="application/octet-stream" sparkle:edSignature="fky/eYnV0J0eM1OEuGHRH4dts5l6xzKgCkZZvaAg2whxhxJ0WAJ4yBlX/nBlEj/rXFOUgSb49SFR4jtCDVFpBg=="/>
+            <description><![CDATA[<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>TinkerSwift-0.3.0</title>
+<body>
+<h2>TinkerSwift 0.3.0</h2>
+<ul>
+<li>- Add snippets (#16) - by @ahmedash95</li>
+</ul>
+</body>
+</html>]]></description>
+        </item>
+        <item>
+            <link>https://raw.githubusercontent.com/ahmedash95/tinkerswift/refs/heads/main/appcast.xml</link>
             <title>0.2.0</title>
             <pubDate>Wed, 25 Feb 2026 22:17:51 +0100</pubDate>
             <sparkle:version>2</sparkle:version>
