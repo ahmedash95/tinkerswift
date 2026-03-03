@@ -210,31 +210,15 @@ struct DockerProjectSetupSheet: View {
     @Environment(WorkspaceState.self) private var workspaceState
     @Environment(\.dismiss) private var dismiss
 
-    @State private var searchText = ""
-    @State private var containers: [DockerContainerSummary] = []
     @State private var selectedContainerID = ""
+    @State private var selectedContainerName = ""
     @State private var projectName = ""
     @State private var detectedProjectPath = ""
-    @State private var isLoadingContainers = false
     @State private var isDetectingPath = false
     @State private var errorMessage = ""
 
-    private var filteredContainers: [DockerContainerSummary] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return containers }
-        return containers.filter { container in
-            container.name.localizedCaseInsensitiveContains(query) ||
-                container.image.localizedCaseInsensitiveContains(query) ||
-                container.id.localizedCaseInsensitiveContains(query)
-        }
-    }
-
-    private var selectedContainer: DockerContainerSummary? {
-        containers.first(where: { $0.id == selectedContainerID })
-    }
-
     private var canSave: Bool {
-        selectedContainer != nil &&
+        !selectedContainerID.isEmpty &&
             !projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             !detectedProjectPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -247,55 +231,10 @@ struct DockerProjectSetupSheet: View {
             Text("Pick a running container, then detect or edit the Laravel project path.")
                 .foregroundStyle(.secondary)
 
-            HStack(spacing: 8) {
-                TextField("Search container", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                Button("Refresh") {
-                    Task { await loadContainers() }
-                }
-                .disabled(isLoadingContainers)
-            }
-
-            if isLoadingContainers {
-                ProgressView("Loading containers...")
-                    .controlSize(.small)
-            } else if filteredContainers.isEmpty {
-                Text("No running containers found.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 6) {
-                        ForEach(filteredContainers) { container in
-                            Button {
-                                selectedContainerID = container.id
-                            } label: {
-                                HStack(alignment: .top) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(container.name)
-                                            .font(.body.weight(.medium))
-                                        Text("\(container.image) • \(container.status)")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    if selectedContainerID == container.id {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(.tint)
-                                    }
-                                }
-                                .padding(8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(selectedContainerID == container.id ? Color.accentColor.opacity(0.15) : Color.clear)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .frame(minHeight: 170, maxHeight: 220)
-            }
+            DockerContainerPicker(
+                selectedContainerID: $selectedContainerID,
+                selectedContainerName: $selectedContainerName
+            )
 
             TextField("Project name", text: $projectName)
                 .textFieldStyle(.roundedBorder)
@@ -313,11 +252,11 @@ struct DockerProjectSetupSheet: View {
                         Text("Detect Path")
                     }
                 }
-                .disabled(selectedContainer == nil || isDetectingPath)
+                .disabled(selectedContainerID.isEmpty || isDetectingPath)
             }
 
-            if let selectedContainer {
-                Text("Selected: \(selectedContainer.name) (\(selectedContainer.id.prefix(12)))")
+            if !selectedContainerID.isEmpty {
+                Text("Selected: \(selectedContainerName) (\(selectedContainerID.prefix(12)))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -340,25 +279,7 @@ struct DockerProjectSetupSheet: View {
         }
         .padding(18)
         .frame(width: 680)
-        .task {
-            await loadContainers()
-        }
         .onChange(of: selectedContainerID) { _, _ in
-            suggestProjectNameIfNeeded()
-        }
-    }
-
-    private func loadContainers() async {
-        isLoadingContainers = true
-        errorMessage = ""
-        containers = await workspaceState.listDockerContainers()
-        isLoadingContainers = false
-
-        if selectedContainerID.isEmpty, let first = containers.first {
-            selectedContainerID = first.id
-            suggestProjectNameIfNeeded()
-        } else if !selectedContainerID.isEmpty, !containers.contains(where: { $0.id == selectedContainerID }) {
-            selectedContainerID = containers.first?.id ?? ""
             suggestProjectNameIfNeeded()
         }
     }
@@ -378,23 +299,31 @@ struct DockerProjectSetupSheet: View {
     }
 
     private func saveProject() {
-        guard let selectedContainer else { return }
+        guard !selectedContainerID.isEmpty else { return }
         let path = detectedProjectPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !path.isEmpty else { return }
-        workspaceState.addDockerProject(container: selectedContainer, projectPath: path, displayName: projectName)
+        
+        let container = DockerContainerSummary(
+            id: selectedContainerID,
+            name: selectedContainerName,
+            image: "", // Not used in addDockerProject currently for summary
+            status: "" // Not used in addDockerProject currently for summary
+        )
+        
+        workspaceState.addDockerProject(container: container, projectPath: path, displayName: projectName)
         dismiss()
     }
 
     private func suggestProjectNameIfNeeded() {
         guard projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        guard let selectedContainer else { return }
+        guard !selectedContainerID.isEmpty else { return }
         let normalizedPath = detectedProjectPath.trimmingCharacters(in: .whitespacesAndNewlines)
         if normalizedPath.isEmpty {
-            projectName = selectedContainer.name
+            projectName = selectedContainerName
             return
         }
         let tail = URL(fileURLWithPath: normalizedPath).lastPathComponent
-        projectName = tail.isEmpty ? selectedContainer.name : "\(selectedContainer.name) · \(tail)"
+        projectName = tail.isEmpty ? selectedContainerName : "\(selectedContainerName) · \(tail)"
     }
 }
 
@@ -630,6 +559,7 @@ private struct ProjectEditSheet: View {
     @State private var sshPassword = ""
 
     @State private var isTestingSSH = false
+    @State private var isDetectingDockerPath = false
     @State private var testStatusMessage = ""
     @State private var errorMessage = ""
 
@@ -682,12 +612,26 @@ private struct ProjectEditSheet: View {
                     TextField("Local path", text: $localPath)
                         .textFieldStyle(.roundedBorder)
                 case .docker:
-                    TextField("Container ID", text: $dockerContainerID)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("Container Name", text: $dockerContainerName)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("Project path in container", text: $dockerProjectPath)
-                        .textFieldStyle(.roundedBorder)
+                    DockerContainerPicker(
+                        selectedContainerID: $dockerContainerID,
+                        selectedContainerName: $dockerContainerName
+                    )
+                    
+                    HStack {
+                        TextField("Project path in container", text: $dockerProjectPath)
+                            .textFieldStyle(.roundedBorder)
+                        Button {
+                            Task { await detectDockerPath() }
+                        } label: {
+                            if isDetectingDockerPath {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Text("Detect Path")
+                            }
+                        }
+                        .disabled(dockerContainerID.isEmpty || isDetectingDockerPath)
+                    }
                 case .ssh:
                     HStack(spacing: 10) {
                         TextField("Host", text: $sshHost)
@@ -900,6 +844,19 @@ private struct ProjectEditSheet: View {
 
         workspaceState.saveEditedProject(oldProjectID: oldProjectID, updatedProject: updated)
         dismiss()
+    }
+
+    private func detectDockerPath() async {
+        guard !dockerContainerID.isEmpty else { return }
+        isDetectingDockerPath = true
+        errorMessage = ""
+        let detected = await workspaceState.detectDockerProjectPaths(containerID: dockerContainerID)
+        isDetectingDockerPath = false
+        if let first = detected.first {
+            dockerProjectPath = first
+        } else {
+            errorMessage = "Could not detect artisan project path automatically."
+        }
     }
 }
 
