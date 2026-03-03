@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -33,6 +33,7 @@
 		3E7DCA4748733C4E52B3BAEF /* SQLiteRunHistoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6086EB03023644EC49FB50A5 /* SQLiteRunHistoryRepository.swift */; };
 		3F1FE015C72C70F7EE46E072 /* WorkspaceExecutionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA49A00672807B78AB9E1BD7 /* WorkspaceExecutionSupport.swift */; };
 		4110EA59E90173991D7934AE /* UIScaleSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2C0758540C37FCD4EDC18F /* UIScaleSanitizer.swift */; };
+		4149601B6230C31C4AD789F7 /* DockerContainerPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93B5ED70BD33D16970479DFA /* DockerContainerPicker.swift */; };
 		47947BE7290FA3042F31D5B3 /* ResultPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E99EE6EBA5EDDCB524D690D3 /* ResultPaneView.swift */; };
 		5270B860C1DFAA7A2198D507 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = DAF46068855723FA63DFF73C /* libsqlite3.tbd */; };
 		555237BAFAC6B1E3E9E01749 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBC131919D5D01EE74C688C4 /* AppContainer.swift */; };
@@ -93,6 +94,7 @@
 		82328598ACFAF8951762EB26 /* SQLiteWorkspaceStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteWorkspaceStoreTests.swift; sourceTree = "<group>"; };
 		82DD7A1F0E73106A79A46028 /* SQLiteOutputCacheRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteOutputCacheRepository.swift; sourceTree = "<group>"; };
 		8CBCB1FAF921EFBA6157963E /* AppKitCodeEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitCodeEditor.swift; sourceTree = "<group>"; };
+		93B5ED70BD33D16970479DFA /* DockerContainerPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockerContainerPicker.swift; sourceTree = "<group>"; };
 		9437A2E57D2555C22BCC6897 /* UserDefaultsWorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsWorkspaceStore.swift; sourceTree = "<group>"; };
 		961585CC2DB23157AFEB1F70 /* SnippetDomainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetDomainTests.swift; sourceTree = "<group>"; };
 		9970863E634F848DBE2C6D5E /* OnboardingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSheet.swift; sourceTree = "<group>"; };
@@ -184,6 +186,7 @@
 			isa = PBXGroup;
 			children = (
 				1B0006A25CE65F698145CFE5 /* ContentView.swift */,
+				93B5ED70BD33D16970479DFA /* DockerContainerPicker.swift */,
 				3FD787F69751EB1A26F08323 /* ReplWorkspaceView.swift */,
 				7D4CC5CAB6A5BF4C78DB4E57 /* RunHistoryWindowView.swift */,
 				A7C26C0529304E0EF4184024 /* SnippetManagerWindowView.swift */,
@@ -398,6 +401,7 @@
 						DevelopmentTeam = "";
 					};
 					FD82EFD2FEF297E2D35758CB = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -417,6 +421,7 @@
 				7DE8D9DB5EE46F5BCF734C97 /* XCRemoteSwiftPackageReference "STTextView-Plugin-Neon" */,
 				C8F42851917A804D1FAC9C95 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
+			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -448,6 +453,7 @@
 				166361F2BCACD7C495FB7FCB /* BinaryTooling.swift in Sources */,
 				70E590EC7C4919DEBEA63AFC /* CompletionContracts.swift in Sources */,
 				D7C3A8CB527F5229279CB7EC /* ContentView.swift in Sources */,
+				4149601B6230C31C4AD789F7 /* DockerContainerPicker.swift in Sources */,
 				EE0A5FA94C50DDBBA0A7D9BF /* EditorCompletionOrchestrator.swift in Sources */,
 				C5532CACA1E938690EBB8AA1 /* EditorPaneView.swift in Sources */,
 				D2E090BC25C85298684DE6E7 /* ExecutionContracts.swift in Sources */,
@@ -529,8 +535,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
-				DEVELOPMENT_TEAM = 7CE3E2W6XY;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = TinkerSwift/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -538,7 +542,6 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.3.0;
 				PRODUCT_NAME = TinkerSwift;
 				SDKROOT = macosx;
 			};
@@ -550,8 +553,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
-				DEVELOPMENT_TEAM = 7CE3E2W6XY;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = TinkerSwift/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -559,7 +560,6 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.3.0;
 				PRODUCT_NAME = TinkerSwift;
 				SDKROOT = macosx;
 			};
