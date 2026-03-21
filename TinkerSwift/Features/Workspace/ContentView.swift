@@ -4,11 +4,70 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Environment(WorkspaceState.self) private var workspaceState
+    @State private var hasScheduledInitialActivation = false
 
     var body: some View {
         @Bindable var workspaceState = workspaceState
 
-        NavigationSplitView(columnVisibility: $workspaceState.columnVisibility) {
+        Group {
+            if workspaceState.hasCompletedInitialRenderActivation {
+                workspaceShell
+                    .toolbar { workspaceToolbar }
+                    .navigationTitle(workspaceState.selectedProjectName)
+                    .navigationSubtitle(workspaceState.selectedProjectSubtitle)
+                    .fileImporter(
+                        isPresented: $workspaceState.isPickingProjectFolder,
+                        allowedContentTypes: [.folder],
+                        allowsMultipleSelection: false
+                    ) { result in
+                        guard case let .success(urls) = result, let url = urls.first else { return }
+                        workspaceState.addLocalProject(url.path)
+                    }
+                    .sheet(isPresented: $workspaceState.isShowingDefaultProjectInstallSheet) {
+                        DefaultProjectInstallSheet()
+                            .environment(workspaceState)
+                    }
+                    .sheet(isPresented: $workspaceState.isShowingDockerProjectSheet) {
+                        DockerProjectSetupSheet()
+                            .environment(workspaceState)
+                    }
+                    .sheet(isPresented: $workspaceState.isShowingSSHProjectSheet) {
+                        SSHProjectSetupSheet()
+                            .environment(workspaceState)
+                    }
+                    .sheet(isPresented: $workspaceState.isShowingProjectEditSheet) {
+                        ProjectEditSheet()
+                            .environment(workspaceState)
+                    }
+                    .sheet(isPresented: $workspaceState.isShowingRenameProjectSheet) {
+                        RenameProjectSheet()
+                            .environment(workspaceState)
+                    }
+                    .sheet(isPresented: $workspaceState.isShowingSymbolSearchSheet) {
+                        SymbolSearchSheet()
+                            .environment(workspaceState)
+                    }
+                    .sheet(isPresented: $workspaceState.isShowingSnippetCaptureSheet) {
+                        SnippetCaptureSheet()
+                            .environment(workspaceState)
+                    }
+                    .focusedSceneValue(\.runCodeAction, workspaceState.runOrRestartFromShortcut)
+                    .focusedSceneValue(\.isRunningScript, workspaceState.isRunning)
+                    .focusedSceneValue(\.workspaceSymbolSearchAction, workspaceState.showWorkspaceSymbolSearchFromShortcut)
+                    .focusedSceneValue(\.documentSymbolSearchAction, workspaceState.showDocumentSymbolSearchFromShortcut)
+                    .focusedSceneValue(\.saveSnippetAction, workspaceState.showSnippetCaptureFromShortcut)
+                    .focusedSceneValue(\.showSnippetManagerAction, workspaceState.showSnippetManagerFromShortcut)
+            } else {
+                workspaceShell
+            }
+        }
+        .onAppear(perform: scheduleInitialActivationIfNeeded)
+    }
+
+    private var workspaceShell: some View {
+        @Bindable var workspaceState = workspaceState
+
+        return NavigationSplitView(columnVisibility: $workspaceState.columnVisibility) {
             ProjectSidebarView()
                 .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 240)
         } content: {
@@ -20,175 +79,141 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 1000, minHeight: 620)
-        .toolbar {
-            ToolbarItemGroup(placement: .navigation) {
-                Menu {
-                    if workspaceState.projects.isEmpty {
-                        Text("No projects added")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(workspaceState.projects) { project in
-                            Button {
-                                workspaceState.selectedProjectID = project.id
-                            } label: {
-                                Label(
-                                    project.name,
-                                    systemImage: workspaceState.selectedProjectID == project.id ? "checkmark" : project.connection.kind.projectSymbolName
-                                )
-                            }
+    }
+
+    @ToolbarContentBuilder
+    private var workspaceToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigation) {
+            Menu {
+                if workspaceState.projects.isEmpty {
+                    Text("No projects added")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(workspaceState.projects) { project in
+                        Button {
+                            workspaceState.selectedProjectID = project.id
+                        } label: {
+                            Label(
+                                project.name,
+                                systemImage: workspaceState.selectedProjectID == project.id ? "checkmark" : project.connection.kind.projectSymbolName
+                            )
                         }
                     }
-
-                    Divider()
-
-                    Button {
-                        workspaceState.isPickingProjectFolder = true
-                    } label: {
-                        Label("Add Local Project", systemImage: "folder.badge.plus")
-                    }
-
-                    Button {
-                        workspaceState.isShowingDockerProjectSheet = true
-                    } label: {
-                        Label("Add Docker Project", systemImage: "shippingbox")
-                    }
-
-                    Button {
-                        workspaceState.isShowingSSHProjectSheet = true
-                    } label: {
-                        Label("Add SSH Project", systemImage: "network")
-                    }
-                } label: {
-                    Image(systemName: "folder")
                 }
-                .help("Switch Project")
 
-                Button(action: workspaceState.toggleRunStop) {
-                    Label(workspaceState.isRunning ? "Stop" : "Run", systemImage: workspaceState.isRunning ? "stop.fill" : "play.fill")
-                }
-            }
-
-            ToolbarItemGroup(placement: .principal) {
-                Button(action: {}) {
-                    Label(workspaceState.memoryUsageText, systemImage: "memorychip")
-                }
-                .labelStyle(.titleAndIcon)
-                .foregroundStyle(.secondary)
-                .help("Peak memory usage")
-
-                Button(action: {}) {
-                    Label(workspaceState.executionTimeText, systemImage: workspaceState.isRunning ? "hourglass" : "stopwatch")
-                }
-                .labelStyle(.titleAndIcon)
-                .foregroundStyle(.secondary)
-                .help("Execution time")
-            }
-
-            ToolbarItemGroup(placement: .automatic) {
-                Button(action: workspaceState.showRunHistoryWindow) {
-                    Image(systemName: "clock.arrow.circlepath")
-                }
-                .help("Run History")
-                .disabled(!workspaceState.canShowRunHistory)
-
-                Button(action: workspaceState.showSnippetManagerWindow) {
-                    Image(systemName: "text.badge.plus")
-                }
-                .help("Snippets")
+                Divider()
 
                 Button {
-                    workspaceState.resultViewMode = .pretty
+                    workspaceState.isPickingProjectFolder = true
                 } label: {
-                    Image(systemName: "paintpalette")
-                        .foregroundStyle(workspaceState.resultViewMode == .pretty ? .primary : .secondary)
+                    Label("Add Local Project", systemImage: "folder.badge.plus")
                 }
-                .help("Pretty View")
 
                 Button {
-                    workspaceState.resultViewMode = .raw
+                    workspaceState.isShowingDockerProjectSheet = true
                 } label: {
-                    Image(systemName: "curlybraces")
-                        .foregroundStyle(workspaceState.resultViewMode == .raw ? .primary : .secondary)
+                    Label("Add Docker Project", systemImage: "shippingbox")
                 }
-                .help("Raw View")
 
-                Menu {
-                    if workspaceState.resultPresentation.hasStdout {
-                        streamMenuButton("Output", mode: .output)
-                    }
-                    if workspaceState.resultPresentation.hasStderr {
-                        streamMenuButton("Error", mode: .error)
-                    }
-                    if workspaceState.resultPresentation.hasStdout && workspaceState.resultPresentation.hasStderr {
-                        streamMenuButton("Both", mode: .combined)
-                    }
-                    if !workspaceState.resultPresentation.hasStdout && !workspaceState.resultPresentation.hasStderr {
-                        Text("No streams available")
-                    }
+                Button {
+                    workspaceState.isShowingSSHProjectSheet = true
                 } label: {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .foregroundStyle(workspaceState.canChooseResultStream ? .primary : .secondary)
+                    Label("Add SSH Project", systemImage: "network")
                 }
-                .help("Choose Stream")
-                .disabled(!workspaceState.canChooseResultStream)
+            } label: {
+                Image(systemName: "folder")
+            }
+            .help("Switch Project")
 
-                Button(action: workspaceState.copyVisibleResultToPasteboard) {
-                    Image(systemName: "doc.on.doc")
-                }
-                .help("Copy Visible Output")
-                .disabled(!workspaceState.canCopyResultOutput)
-
-                Button(action: workspaceState.revealSelectedProjectInFinder) {
-                    Image(systemName: "folder.badge.gearshape")
-                }
-                .help("Reveal in Finder")
-                .disabled(!workspaceState.canRevealSelectedProjectInFinder)
+            Button(action: workspaceState.toggleRunStop) {
+                Label(workspaceState.isRunning ? "Stop" : "Run", systemImage: workspaceState.isRunning ? "stop.fill" : "play.fill")
             }
         }
-        .navigationTitle(workspaceState.selectedProjectName)
-        .navigationSubtitle(workspaceState.selectedProjectSubtitle)
-        .fileImporter(
-            isPresented: $workspaceState.isPickingProjectFolder,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            guard case let .success(urls) = result, let url = urls.first else { return }
-            workspaceState.addLocalProject(url.path)
+
+        ToolbarItemGroup(placement: .principal) {
+            Button(action: {}) {
+                Label(workspaceState.memoryUsageText, systemImage: "memorychip")
+            }
+            .labelStyle(.titleAndIcon)
+            .foregroundStyle(.secondary)
+            .help("Peak memory usage")
+
+            Button(action: {}) {
+                Label(workspaceState.executionTimeText, systemImage: workspaceState.isRunning ? "hourglass" : "stopwatch")
+            }
+            .labelStyle(.titleAndIcon)
+            .foregroundStyle(.secondary)
+            .help("Execution time")
         }
-        .sheet(isPresented: $workspaceState.isShowingDefaultProjectInstallSheet) {
-            DefaultProjectInstallSheet()
-                .environment(workspaceState)
+
+        ToolbarItemGroup(placement: .automatic) {
+            Button(action: workspaceState.showRunHistoryWindow) {
+                Image(systemName: "clock.arrow.circlepath")
+            }
+            .help("Run History")
+            .disabled(!workspaceState.canShowRunHistory)
+
+            Button(action: workspaceState.showSnippetManagerWindow) {
+                Image(systemName: "text.badge.plus")
+            }
+            .help("Snippets")
+
+            Button {
+                workspaceState.resultViewMode = .pretty
+            } label: {
+                Image(systemName: "paintpalette")
+                    .foregroundStyle(workspaceState.resultViewMode == .pretty ? .primary : .secondary)
+            }
+            .help("Pretty View")
+
+            Button {
+                workspaceState.resultViewMode = .raw
+            } label: {
+                Image(systemName: "curlybraces")
+                    .foregroundStyle(workspaceState.resultViewMode == .raw ? .primary : .secondary)
+            }
+            .help("Raw View")
+
+            Menu {
+                if workspaceState.resultPresentation.hasStdout {
+                    streamMenuButton("Output", mode: .output)
+                }
+                if workspaceState.resultPresentation.hasStderr {
+                    streamMenuButton("Error", mode: .error)
+                }
+                if workspaceState.resultPresentation.hasStdout && workspaceState.resultPresentation.hasStderr {
+                    streamMenuButton("Both", mode: .combined)
+                }
+                if !workspaceState.resultPresentation.hasStdout && !workspaceState.resultPresentation.hasStderr {
+                    Text("No streams available")
+                }
+            } label: {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .foregroundStyle(workspaceState.canChooseResultStream ? .primary : .secondary)
+            }
+            .help("Choose Stream")
+            .disabled(!workspaceState.canChooseResultStream)
+
+            Button(action: workspaceState.copyVisibleResultToPasteboard) {
+                Image(systemName: "doc.on.doc")
+            }
+            .help("Copy Visible Output")
+            .disabled(!workspaceState.canCopyResultOutput)
+
+            Button(action: workspaceState.revealSelectedProjectInFinder) {
+                Image(systemName: "folder.badge.gearshape")
+            }
+            .help("Reveal in Finder")
+            .disabled(!workspaceState.canRevealSelectedProjectInFinder)
         }
-        .sheet(isPresented: $workspaceState.isShowingDockerProjectSheet) {
-            DockerProjectSetupSheet()
-                .environment(workspaceState)
+    }
+
+    private func scheduleInitialActivationIfNeeded() {
+        guard !hasScheduledInitialActivation else { return }
+        hasScheduledInitialActivation = true
+        DispatchQueue.main.async {
+            workspaceState.activateAfterInitialRender()
         }
-        .sheet(isPresented: $workspaceState.isShowingSSHProjectSheet) {
-            SSHProjectSetupSheet()
-                .environment(workspaceState)
-        }
-        .sheet(isPresented: $workspaceState.isShowingProjectEditSheet) {
-            ProjectEditSheet()
-                .environment(workspaceState)
-        }
-        .sheet(isPresented: $workspaceState.isShowingRenameProjectSheet) {
-            RenameProjectSheet()
-                .environment(workspaceState)
-        }
-        .sheet(isPresented: $workspaceState.isShowingSymbolSearchSheet) {
-            SymbolSearchSheet()
-                .environment(workspaceState)
-        }
-        .sheet(isPresented: $workspaceState.isShowingSnippetCaptureSheet) {
-            SnippetCaptureSheet()
-                .environment(workspaceState)
-        }
-        .focusedSceneValue(\.runCodeAction, workspaceState.runOrRestartFromShortcut)
-        .focusedSceneValue(\.isRunningScript, workspaceState.isRunning)
-        .focusedSceneValue(\.workspaceSymbolSearchAction, workspaceState.showWorkspaceSymbolSearchFromShortcut)
-        .focusedSceneValue(\.documentSymbolSearchAction, workspaceState.showDocumentSymbolSearchFromShortcut)
-        .focusedSceneValue(\.saveSnippetAction, workspaceState.showSnippetCaptureFromShortcut)
-        .focusedSceneValue(\.showSnippetManagerAction, workspaceState.showSnippetManagerFromShortcut)
     }
 
     @ViewBuilder

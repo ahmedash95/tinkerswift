@@ -50,6 +50,10 @@ struct ResultPaneView: View {
         }
     }
 
+    private var enablesInteractiveRendering: Bool {
+        workspaceState.hasCompletedInitialRenderActivation
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if workspaceState.isRunning {
@@ -110,10 +114,16 @@ struct ResultPaneView: View {
                     Text(section.title)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text(section.content)
-                        .textSelection(.enabled)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                    if enablesInteractiveRendering {
+                        Text(section.content)
+                            .textSelection(.enabled)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                    } else {
+                        Text(section.content)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -136,11 +146,23 @@ struct ResultPaneView: View {
     private var rawView: some View {
         let output = workspaceState.rawResultText.isEmpty ? "(empty)" : workspaceState.rawResultText
 
-        return Text(makeRawAttributedString(output))
-            .textSelection(.enabled)
-            .multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .padding(12)
+        if enablesInteractiveRendering {
+            return AnyView(
+                Text(makeRawAttributedString(output))
+                    .textSelection(.enabled)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(12)
+            )
+        }
+
+        return AnyView(
+            Text(output)
+                .font(.system(size: 14 * workspaceState.scale, design: .monospaced))
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(12)
+        )
     }
 
     private func primarySectionBackground(for index: Int) -> Color {

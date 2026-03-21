@@ -18,7 +18,8 @@ struct EditorPaneView: View {
             lspAutoTriggerEnabled: workspaceState.lspAutoTriggerEnabled,
             lspServerPathOverride: workspaceState.lspServerPathOverride,
             lspLanguageID: workspaceState.completionLanguageID,
-            completionProvider: workspaceState.completionProvider
+            completionProvider: workspaceState.completionProvider,
+            activateVisualStateUpdates: workspaceState.hasCompletedInitialRenderActivation
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }

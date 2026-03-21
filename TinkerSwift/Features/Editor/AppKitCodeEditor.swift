@@ -22,6 +22,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
     let lspServerPathOverride: String
     let lspLanguageID: String
     let completionProvider: any CompletionProviding
+    let activateVisualStateUpdates: Bool
 
     init(
         text: Binding<String>,
@@ -36,7 +37,8 @@ struct AppKitCodeEditor: NSViewRepresentable {
         lspAutoTriggerEnabled: Bool = true,
         lspServerPathOverride: String = "",
         lspLanguageID: String = "php",
-        completionProvider: any CompletionProviding = PHPLSPService()
+        completionProvider: any CompletionProviding = PHPLSPService(),
+        activateVisualStateUpdates: Bool = true
     ) {
         _text = text
         self.fontSize = fontSize
@@ -51,6 +53,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         self.lspServerPathOverride = lspServerPathOverride
         self.lspLanguageID = lspLanguageID
         self.completionProvider = completionProvider
+        self.activateVisualStateUpdates = activateVisualStateUpdates
     }
 
     func makeCoordinator() -> Coordinator {
@@ -62,7 +65,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = EditorHostScrollView(frame: .zero)
+        let scrollView = NSScrollView(frame: .zero)
         let textView = CodePaneTextView(frame: .zero)
 
         scrollView.wantsLayer = true
@@ -76,7 +79,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         scrollView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
         scrollView.documentView = textView
 
-        context.coordinator.attachEditorTextView(textView)
+        context.coordinator.attachEditorTextView(textView, activateVisualStateUpdates: activateVisualStateUpdates)
         textView.textDelegate = context.coordinator
         textView.textColor = .textColor
         textView.backgroundColor = .clear
@@ -97,7 +100,10 @@ struct AppKitCodeEditor: NSViewRepresentable {
         context.coordinator.applyEditorFont(fontSize, to: textView, force: true)
         context.coordinator.installPluginsIfNeeded(on: textView)
         context.coordinator.updateSyntaxHighlighting(syntaxHighlighting, on: textView, force: true)
-        context.coordinator.updateVisualState(on: textView, force: true)
+        context.coordinator.setVisualStateUpdatesEnabled(activateVisualStateUpdates, on: textView)
+        if activateVisualStateUpdates {
+            context.coordinator.updateVisualState(on: textView, force: true)
+        }
         context.coordinator.configureLSP(
             projectPath: projectPath,
             enabled: isEditable && lspCompletionEnabled,
@@ -105,7 +111,6 @@ struct AppKitCodeEditor: NSViewRepresentable {
             serverPathOverride: lspServerPathOverride,
             currentText: textView.text ?? ""
         )
-        scrollView.stretchDocumentViewToViewportIfNeeded()
         return scrollView
     }
 
@@ -115,7 +120,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         }
 
         scrollView.backgroundColor = .clear
-        context.coordinator.attachEditorTextView(textView)
+        context.coordinator.attachEditorTextView(textView, activateVisualStateUpdates: activateVisualStateUpdates)
 
         if (textView.text ?? "") != text {
             context.coordinator.isSyncing = true
@@ -130,7 +135,10 @@ struct AppKitCodeEditor: NSViewRepresentable {
         textView.isHorizontallyResizable = !wrapLines
         context.coordinator.applyEditorFont(fontSize, to: textView)
         context.coordinator.updateSyntaxHighlighting(syntaxHighlighting, on: textView)
-        context.coordinator.updateVisualState(on: textView)
+        context.coordinator.setVisualStateUpdatesEnabled(activateVisualStateUpdates, on: textView)
+        if activateVisualStateUpdates {
+            context.coordinator.updateVisualState(on: textView)
+        }
         context.coordinator.configureLSP(
             projectPath: projectPath,
             enabled: isEditable && lspCompletionEnabled,
@@ -138,7 +146,6 @@ struct AppKitCodeEditor: NSViewRepresentable {
             serverPathOverride: lspServerPathOverride,
             currentText: textView.text ?? ""
         )
-        (scrollView as? EditorHostScrollView)?.stretchDocumentViewToViewportIfNeeded()
     }
 
     @MainActor
@@ -150,6 +157,7 @@ struct AppKitCodeEditor: NSViewRepresentable {
         private var neonPlugin: TinkerNeonPlugin?
         private var lastSyntaxHighlightingEnabled: Bool?
         private var lastVisualStateSignature: String?
+        private var isVisualStateUpdatesEnabled = false
 
         private let completionOrchestrator: EditorCompletionOrchestrator
         private var completionPopupFontSize: CGFloat = 12
@@ -164,14 +172,31 @@ struct AppKitCodeEditor: NSViewRepresentable {
             )
         }
 
-        fileprivate func attachEditorTextView(_ textView: CodePaneTextView) {
-            guard self.textView !== textView else { return }
+        fileprivate func attachEditorTextView(_ textView: CodePaneTextView, activateVisualStateUpdates: Bool) {
+            guard self.textView !== textView else {
+                setVisualStateUpdatesEnabled(activateVisualStateUpdates, on: textView)
+                return
+            }
 
             self.textView?.onVisualStateChange = nil
             self.textView = textView
-            textView.onVisualStateChange = { [weak self, weak textView] in
-                guard let self, let textView else { return }
-                self.updateVisualState(on: textView, force: true)
+            setVisualStateUpdatesEnabled(activateVisualStateUpdates, on: textView)
+        }
+
+        fileprivate func setVisualStateUpdatesEnabled(_ enabled: Bool, on textView: CodePaneTextView) {
+            guard isVisualStateUpdatesEnabled != enabled || self.textView !== textView else {
+                return
+            }
+
+            isVisualStateUpdatesEnabled = enabled
+            textView.setVisualStateObservationEnabled(enabled)
+            if enabled {
+                textView.onVisualStateChange = { [weak self, weak textView] in
+                    guard let self, let textView else { return }
+                    self.updateVisualState(on: textView, force: true)
+                }
+            } else {
+                textView.onVisualStateChange = nil
             }
         }
 
@@ -436,45 +461,10 @@ struct AppKitCodeEditor: NSViewRepresentable {
     }
 }
 
-fileprivate final class EditorHostScrollView: NSScrollView {
-    override var intrinsicContentSize: NSSize {
-        NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
-    }
-
-    override var fittingSize: NSSize {
-        NSSize(width: 1, height: 1)
-    }
-
-    override func layout() {
-        super.layout()
-        stretchDocumentViewToViewportIfNeeded()
-    }
-
-    func stretchDocumentViewToViewportIfNeeded() {
-        guard let documentView else { return }
-
-        let viewportSize = contentView.bounds.size
-        var frame = documentView.frame
-        var needsUpdate = false
-
-        if frame.width < viewportSize.width {
-            frame.size.width = viewportSize.width
-            needsUpdate = true
-        }
-        if frame.height < viewportSize.height {
-            frame.size.height = viewportSize.height
-            needsUpdate = true
-        }
-
-        if needsUpdate {
-            documentView.frame = frame
-        }
-    }
-}
-
 fileprivate final class CodePaneTextView: STTextView {
     var onVisualStateChange: (() -> Void)?
     private weak var observedWindow: NSWindow?
+    private var isVisualStateObservationEnabled = false
 
     override var intrinsicContentSize: NSSize {
         NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
@@ -493,6 +483,12 @@ fileprivate final class CodePaneTextView: STTextView {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+    }
+
+    func setVisualStateObservationEnabled(_ enabled: Bool) {
+        isVisualStateObservationEnabled = enabled
+        guard enabled else { return }
+        notifyVisualStateChanged()
     }
 
     private func reconfigureObservers() {
@@ -572,6 +568,7 @@ fileprivate final class CodePaneTextView: STTextView {
     }
 
     private func notifyVisualStateChanged() {
+        guard isVisualStateObservationEnabled else { return }
         DispatchQueue.main.async { [weak self] in
             self?.onVisualStateChange?()
         }

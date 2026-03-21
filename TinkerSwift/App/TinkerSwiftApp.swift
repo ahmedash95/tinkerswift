@@ -150,6 +150,7 @@ struct WorkspaceRootView: View {
     @State private var workspaceState: WorkspaceState
     @State private var isShowingOnboarding = false
     @State private var isShowingStartupRecoveryAlert = false
+    @State private var hasAppliedStartupAppearance = false
 
     init(appModel: AppModel) {
         self.appModel = appModel
@@ -178,19 +179,35 @@ struct WorkspaceRootView: View {
                 Text(appModel.startupRecoveryMessage ?? "")
             }
             .onAppear {
-                if !appModel.hasCompletedOnboarding {
-                    isShowingOnboarding = true
-                }
-                isShowingStartupRecoveryAlert = appModel.startupRecoveryMessage != nil
+                syncStartupPresentationStateIfReady()
+            }
+            .onChange(of: workspaceState.hasCompletedInitialRenderActivation) { _, _ in
+                syncStartupPresentationStateIfReady()
             }
             .onChange(of: appModel.hasCompletedOnboarding) { _, completed in
+                guard workspaceState.hasCompletedInitialRenderActivation else { return }
                 if completed {
                     isShowingOnboarding = false
+                } else {
+                    isShowingOnboarding = true
                 }
             }
             .onChange(of: appModel.startupRecoveryMessage) { _, message in
+                guard workspaceState.hasCompletedInitialRenderActivation else { return }
                 isShowingStartupRecoveryAlert = message != nil
             }
+    }
+
+    private func syncStartupPresentationStateIfReady() {
+        guard workspaceState.hasCompletedInitialRenderActivation else { return }
+        if !hasAppliedStartupAppearance {
+            hasAppliedStartupAppearance = true
+            appModel.appTheme.applyAppearance()
+        }
+        if !appModel.hasCompletedOnboarding {
+            isShowingOnboarding = true
+        }
+        isShowingStartupRecoveryAlert = appModel.startupRecoveryMessage != nil
     }
 }
 
@@ -208,7 +225,6 @@ struct TinkerSwiftApp: App {
             WorkspaceRootView(container: container)
                 .onAppear {
                     appDelegate.setAppModel(container.appModel)
-                    container.appModel.appTheme.applyAppearance()
                 }
         }
         .commands {

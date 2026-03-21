@@ -325,6 +325,7 @@ return $users->toJson();
     private var snippetManagerWindowController: NSWindowController?
     private var snippetManagerWindowCloseObserver: NSObjectProtocol?
     private weak var snippetEditorTargetWindow: NSWindow?
+    private var hasActivatedAfterInitialRender = false
 
     var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
     var isPickingProjectFolder = false
@@ -374,10 +375,12 @@ return $users->toJson();
             if selectedProjectID != oldValue {
                 persistOutputCache(for: oldValue)
                 appModel.setEditorDraft(code, for: oldValue)
-                evaluateDefaultProjectSelection(showPromptIfMissing: true)
                 selectedRunHistoryItemID = nil
-                loadCodeDraftForCurrentProject()
-                restoreOutputForCurrentProject()
+                if hasActivatedAfterInitialRender {
+                    evaluateDefaultProjectSelection(showPromptIfMissing: true)
+                    loadCodeDraftForCurrentProject()
+                    restoreOutputForCurrentProject()
+                }
             }
             updateRunHistoryWindowTitle()
         }
@@ -407,9 +410,6 @@ return $users->toJson();
         } else {
             selectedProjectID = savedProjectID
         }
-        loadCodeDraftForCurrentProject()
-        restoreOutputForCurrentProject()
-        evaluateDefaultProjectSelection(showPromptIfMissing: selectedProjectID == defaultProject.id)
     }
 
     deinit {
@@ -716,6 +716,10 @@ return $users->toJson();
         }
     }
 
+    var hasCompletedInitialRenderActivation: Bool {
+        hasActivatedAfterInitialRender
+    }
+
     func toggleRunStop() {
         if isRunning {
             pendingRestartAfterStop = false
@@ -752,6 +756,14 @@ return $users->toJson();
         Task { [weak self] in
             await self?.performDefaultProjectInstallation(command: installCommand)
         }
+    }
+
+    func activateAfterInitialRender() {
+        guard !hasActivatedAfterInitialRender else { return }
+        hasActivatedAfterInitialRender = true
+        loadCodeDraftForCurrentProject()
+        restoreOutputForCurrentProject()
+        evaluateDefaultProjectSelection(showPromptIfMissing: selectedProjectID == defaultProject.id)
     }
 
     func addLocalProject(_ path: String) {
