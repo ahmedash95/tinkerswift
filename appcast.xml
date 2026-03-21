@@ -6,6 +6,27 @@
         <description>TinkerSwift updates</description>
         <item>
             <link>https://raw.githubusercontent.com/ahmedash95/tinkerswift/refs/heads/main/appcast.xml</link>
+            <title>0.4.0</title>
+            <pubDate>Sat, 21 Mar 2026 12:00:00 +0000</pubDate>
+            <sparkle:version>4</sparkle:version>
+            <sparkle:shortVersionString>0.4.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/ahmedash95/tinkerswift/releases/download/0.4.0/tinkerswift-0.4.0.dmg" length="7828268" type="application/octet-stream" sparkle:edSignature="yKriCvYrQUul3jGcWkpBra0XJFCL7xiOqIbdIdOlOWkT0vF7Wc17TALyWaGADUiuEuKqApBr35zfzlI0A2vMCQ=="/>
+            <description><![CDATA[<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>TinkerSwift-0.4.0</title>
+<body>
+<h2>TinkerSwift 0.4.0</h2>
+<ul>
+<li>- Fix macOS 26.2 startup layout recursion in workspace shell - by @ahmedash95</li>
+<li>- Implement DockerContainerPicker and automatic container ID resolution (#19) - by @saurabhsharma2u</li>
+</ul>
+</body>
+</html>]]></description>
+        </item>
+        <item>
+            <link>https://raw.githubusercontent.com/ahmedash95/tinkerswift/refs/heads/main/appcast.xml</link>
             <title>0.3.0</title>
             <pubDate>Sat, 28 Feb 2026 12:00:00 +0000</pubDate>
             <sparkle:version>3</sparkle:version>

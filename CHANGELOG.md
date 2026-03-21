@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-03-21
+
+- Fix macOS 26.2 startup layout recursion in workspace shell - by @ahmedash95
+- Implement DockerContainerPicker and automatic container ID resolution (#19) - by @saurabhsharma2u
+
 ## [0.3.0] - 2026-02-28
 
 - Add snippets (#16) - by @ahmedash95
