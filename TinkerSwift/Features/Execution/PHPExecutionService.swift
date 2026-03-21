@@ -41,6 +41,11 @@ actor DockerEnvironmentService {
         }
     }
 
+    func findContainerID(byName name: String) async -> String? {
+        let containers = await listRunningContainers()
+        return containers.first(where: { $0.name == name })?.id
+    }
+
     func detectProjectPaths(containerID: String) async -> [String] {
         let command = [
             "exec",
@@ -430,6 +435,7 @@ try {
     }
 
     private func runDocker(code: String, config: DockerProjectConfig) async -> PHPExecutionResult {
+        let containerID = await resolveDockerContainerID(config: config)
         let body = Self.normalizedSnippetBody(code)
         let encodedBody = Data(body.utf8).base64EncodedString()
         let script = """
@@ -495,7 +501,7 @@ try {
 
         guard let dockerPath = BinaryPathResolver.effectivePath(for: .docker) else {
             return PHPExecutionResult(
-                command: "docker exec -i -w \(config.projectPath) \(config.containerID) php",
+                command: "docker exec -i -w \(config.projectPath) \(containerID) php",
                 stdout: "",
                 stderr: "Docker binary not found. Please install docker or add it to PATH.",
                 exitCode: 127,
@@ -512,7 +518,7 @@ try {
             "-i",
             "-w",
             config.projectPath,
-            config.containerID,
+            containerID,
             "php",
             "-d",
             "display_errors=1",
@@ -545,7 +551,7 @@ try {
                 (output.terminationStatus == SIGTERM || output.terminationStatus == SIGINT)
 
             return PHPExecutionResult(
-                command: "docker exec -i -w \(config.projectPath) \(config.containerID) php",
+                command: "docker exec -i -w \(config.projectPath) \(containerID) php",
                 stdout: stdout,
                 stderr: parsed.stderr,
                 exitCode: output.terminationStatus,
@@ -556,7 +562,7 @@ try {
         } catch {
             _ = endActiveExecution(runID)
             return PHPExecutionResult(
-                command: "docker exec -i -w \(config.projectPath) \(config.containerID) php",
+                command: "docker exec -i -w \(config.projectPath) \(containerID) php",
                 stdout: "",
                 stderr: "Failed to run Docker PHP process: \(error.localizedDescription)",
                 exitCode: 1,
@@ -565,6 +571,23 @@ try {
                 wasStopped: false
             )
         }
+    }
+
+    private func resolveDockerContainerID(config: DockerProjectConfig) async -> String {
+        let service = DockerEnvironmentService.shared
+        // Try to find if the stored ID is still valid/running
+        let containers = await service.listRunningContainers()
+        if containers.contains(where: { $0.id == config.containerID }) {
+            return config.containerID
+        }
+        
+        // If not, try to find by name
+        if let match = containers.first(where: { $0.name == config.containerName }) {
+            return match.id
+        }
+        
+        // Fallback to stored ID if nothing found (it will fail anyway, but it's the best we have)
+        return config.containerID
     }
 
     private func runSSH(code: String, config: SSHProjectConfig) async -> PHPExecutionResult {
